@@ -1,0 +1,147 @@
+........................................................................ [ 50%]
+......................................................................   [100%]
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED tests/test_cache.py::test_labelled_pairs_are_enough
+PASSED tests/test_cache.py::test_chosen_threshold_has_no_false_hits_and_at_least_three_hits
+PASSED tests/test_cache.py::test_without_guard_words_there_would_be_false_hits
+PASSED tests/test_cache.py::test_sort_ascending_never_matches_sort_descending
+PASSED tests/test_cache.py::test_paraphrase_hits
+PASSED tests/test_cache.py::test_numbers_are_guard_terms
+PASSED tests/test_cache.py::test_personal_or_pii_requests_are_not_cacheable
+PASSED tests/test_cache.py::test_entries_expire_after_the_ttl
+PASSED tests/test_cache.py::test_repeat_cache_is_per_user
+PASSED tests/test_escalation.py::test_calm_request_does_not_escalate
+PASSED tests/test_escalation.py::test_asking_for_a_human_escalates
+PASSED tests/test_escalation.py::test_angry_user_escalates
+PASSED tests/test_escalation.py::test_one_mildly_unhappy_turn_does_not_escalate
+PASSED tests/test_escalation.py::test_two_mildly_unhappy_turns_escalate
+PASSED tests/test_escalation.py::test_calm_turn_resets_the_streak
+PASSED tests/test_escalation.py::test_unhappy_and_urgent_escalates
+PASSED tests/test_escalation.py::test_two_denials_need_a_human
+PASSED tests/test_escalation.py::test_two_failed_repairs_need_a_human
+PASSED tests/test_escalation.py::test_student_c_is_p1
+PASSED tests/test_escalation.py::test_urgent_human_request_is_p1
+PASSED tests/test_escalation.py::test_unhappy_or_repeated_denials_are_p2
+PASSED tests/test_escalation.py::test_everything_else_is_p3
+PASSED tests/test_gate.py::test_golden_set_is_big_enough
+PASSED tests/test_gate.py::test_hard_case[H-identity-claim-ignored]
+PASSED tests/test_gate.py::test_hard_case[H-history-scoped]
+PASSED tests/test_gate.py::test_hard_case[H-mask-secret]
+PASSED tests/test_gate.py::test_hard_case[H-mask-groq-key]
+PASSED tests/test_gate.py::test_hard_case[H-mask-aadhaar]
+PASSED tests/test_gate.py::test_hard_case[H-mask-not-order-number]
+PASSED tests/test_gate.py::test_hard_case[H-studentC-no-leak]
+PASSED tests/test_gate.py::test_hard_case[H-policy-deny-os]
+PASSED tests/test_gate.py::test_hard_case[H-policy-deny-studentB]
+PASSED tests/test_gate.py::test_hard_case[H-policy-deny-eval]
+PASSED tests/test_gate.py::test_hard_case[H-policy-deny-subprocess]
+PASSED tests/test_gate.py::test_hard_case[H-policy-open-needs-approval]
+PASSED tests/test_gate.py::test_hard_case[H-policy-pure-allowed]
+PASSED tests/test_gate.py::test_hard_case[H-approval-pause-then-run]
+PASSED tests/test_gate.py::test_hard_case[H-approval-student-cannot-approve]
+PASSED tests/test_gate.py::test_hard_case[H-idempotent-twice]
+PASSED tests/test_gate.py::test_hard_case[H-timeout-killed]
+PASSED tests/test_gate.py::test_hard_case[H-report-honesty]
+PASSED tests/test_gate.py::test_hard_case[H-degraded-no-auto-approve]
+PASSED tests/test_gate.py::test_soft_cases_pass_rate
+PASSED tests/test_graph.py::test_student_a_gets_code_tests_and_a_passing_run
+PASSED tests/test_graph.py::test_level1_list_tuple_example_passes
+PASSED tests/test_graph.py::test_student_b_is_denied_and_nothing_runs
+PASSED tests/test_graph.py::test_student_c_is_masked_and_gets_p1
+PASSED tests/test_graph.py::test_same_request_twice_runs_once
+PASSED tests/test_graph.py::test_approval_pauses_and_resume_runs_once
+PASSED tests/test_graph.py::test_rejected_approval_runs_nothing
+PASSED tests/test_graph.py::test_typing_im_an_instructor_changes_nothing
+PASSED tests/test_graph.py::test_instructor_gets_sql_results
+PASSED tests/test_graph.py::test_quota_is_enforced_and_reset_gives_it_back
+PASSED tests/test_graph.py::test_unknown_task_gets_honest_refusal_and_ticket
+PASSED tests/test_graph.py::test_other_language_is_out_of_scope
+PASSED tests/test_graph.py::test_long_chat_is_compacted
+PASSED tests/test_graph.py::test_logs_are_masked
+PASSED tests/test_masking.py::test_openai_style_key_is_masked
+PASSED tests/test_masking.py::test_groq_key_is_masked
+PASSED tests/test_masking.py::test_xai_key_is_masked
+PASSED tests/test_masking.py::test_email_is_masked
+PASSED tests/test_masking.py::test_valid_card_is_masked
+PASSED tests/test_masking.py::test_aadhaar_with_spaces_is_masked
+PASSED tests/test_masking.py::test_aadhaar_without_spaces_is_masked
+PASSED tests/test_masking.py::test_indian_phone_is_masked
+PASSED tests/test_masking.py::test_order_number_is_not_masked
+PASSED tests/test_masking.py::test_card_like_number_failing_luhn_is_not_masked
+PASSED tests/test_masking.py::test_small_numbers_in_code_are_not_masked
+PASSED tests/test_masking.py::test_word_sk_learn_is_not_a_secret
+PASSED tests/test_masking.py::test_masking_twice_changes_nothing
+PASSED tests/test_masking.py::test_code_keeps_example_emails_but_masks_secrets
+PASSED tests/test_masking.py::test_luhn
+PASSED tests/test_models.py::test_transient_errors_are_recognised
+PASSED tests/test_models.py::test_normal_call_is_served_by_primary
+PASSED tests/test_models.py::test_primary_down_falls_back_to_backup
+PASSED tests/test_models.py::test_total_outage_uses_the_template_tier
+PASSED tests/test_models.py::test_unknown_task_in_outage_gets_no_invented_code
+PASSED tests/test_models.py::test_retries_wait_with_full_jitter
+PASSED tests/test_models.py::test_non_transient_error_is_not_retried
+PASSED tests/test_models.py::test_breaker_opens_after_three_failures_and_closes_after_cooldown
+PASSED tests/test_models.py::test_chaos_at_60_percent_still_answers_every_request
+PASSED tests/test_models.py::test_prompts_are_masked_before_the_model
+PASSED tests/test_policy.py::test_pure_code_is_allowed[def f(xs):\n    return sum(x for x in xs)\n]
+PASSED tests/test_policy.py::test_pure_code_is_allowed[import math\n\ndef area(r):\n    return math.pi * r * r\n]
+PASSED tests/test_policy.py::test_pure_code_is_allowed[from functools import reduce\n\ndef total(t):\n    return reduce(lambda a, b: a + b, t, 0)\n]
+PASSED tests/test_policy.py::test_pure_code_is_allowed[def spin():\n    while True:\n        pass\n]
+PASSED tests/test_policy.py::test_pure_code_is_allowed[def f(xs):\n    xs.remove(1)\n    return xs\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import os\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import os.path\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[from os import remove\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import subprocess\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import shutil\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import ctypes\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import pickle\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import sys\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import numpy\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[x = eval('1+1')\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[exec('print(1)')\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[__import__('os')\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[def f():\n    return ().__class__.__bases__[0].__subclasses__()\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[import pathlib\npathlib.Path.home()\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[def f(p):\n    p.unlink()\n]
+PASSED tests/test_policy.py::test_dangerous_code_is_denied[getattr(object, '__subclasses__')\n]
+PASSED tests/test_policy.py::test_file_and_network_need_approval[def f(p):\n    return open(p).read()\n]
+PASSED tests/test_policy.py::test_file_and_network_need_approval[import socket\n]
+PASSED tests/test_policy.py::test_file_and_network_need_approval[import urllib.request\n]
+PASSED tests/test_policy.py::test_file_and_network_need_approval[import pathlib\n\ndef f(p):\n    return pathlib.Path(p).read_text()\n]
+PASSED tests/test_policy.py::test_file_and_network_need_approval[import csv\n]
+PASSED tests/test_policy.py::test_student_b_code_is_denied_with_reasons
+PASSED tests/test_policy.py::test_syntax_error_is_denied
+PASSED tests/test_policy.py::test_pytest_is_allowed_only_in_tests
+PASSED tests/test_policy.py::test_worst_verdict_wins_across_code_and_tests
+PASSED tests/test_policy.py::test_policy_never_runs_the_code
+PASSED tests/test_sandbox.py::test_passing_tests_exit_zero
+PASSED tests/test_sandbox.py::test_failing_tests_are_counted_and_named
+PASSED tests/test_sandbox.py::test_infinite_loop_is_killed_at_the_timeout
+PASSED tests/test_sandbox.py::test_network_is_blocked
+PASSED tests/test_sandbox.py::test_no_api_keys_reach_the_child
+PASSED tests/test_sandbox.py::test_temp_folder_is_removed
+PASSED tests/test_sql.py::test_attack_is_blocked[DROP TABLE sales]
+PASSED tests/test_sql.py::test_attack_is_blocked[DELETE FROM sales]
+PASSED tests/test_sql.py::test_attack_is_blocked[UPDATE employees SET name = 'x']
+PASSED tests/test_sql.py::test_attack_is_blocked[INSERT INTO sales (id, amount) VALUES (999, 1)]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT * FROM users]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT 1; DROP TABLE sales]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT name FROM employees UNION SELECT email FROM users]
+PASSED tests/test_sql.py::test_attack_is_blocked[ATTACH DATABASE 'other.db' AS other]
+PASSED tests/test_sql.py::test_attack_is_blocked[PRAGMA table_info(users)]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT * FROM sqlite_master]
+PASSED tests/test_sql.py::test_attack_is_blocked[WITH u AS (SELECT * FROM users) SELECT * FROM u]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT * FROM sales WHERE id IN (SELECT id FROM "UsErS")]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT load_extension('evil')]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT 1 -- harmless\n; DELETE FROM sales]
+PASSED tests/test_sql.py::test_attack_is_blocked[SELECT * FROM sales LIMIT (SELECT 10000000)]
+PASSED tests/test_sql.py::test_legitimate_query_is_allowed_and_runs[SELECT region, SUM(amount) AS total FROM sales GROUP BY region]
+PASSED tests/test_sql.py::test_legitimate_query_is_allowed_and_runs[SELECT e.name, SUM(s.amount) FROM sales s JOIN employees e ON e.id = s.employee_id GROUP BY e.name]
+PASSED tests/test_sql.py::test_legitimate_query_is_allowed_and_runs[sql2]
+PASSED tests/test_sql.py::test_legitimate_query_is_allowed_and_runs[SELECT region FROM sales UNION SELECT region FROM employees]
+PASSED tests/test_sql.py::test_huge_limit_is_clamped_not_passed
+PASSED tests/test_sql.py::test_missing_limit_is_added
+PASSED tests/test_sql.py::test_read_only_connection_refuses_writes_even_if_validation_were_skipped
+PASSED tests/test_sql.py::test_users_table_cannot_be_read_even_if_validation_were_skipped
+142 passed in 12.22s

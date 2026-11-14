@@ -2,7 +2,7 @@
 
 > **The model supplies judgement. Code makes the decision.**
 >
-> Status: **Phase 1, version 2 (simplified). Waiting for approval.** Nothing has been built yet.
+> Status: **Approved and built** (Phase 2). Changes made while building are listed in [DECISIONS.md](DECISIONS.md).
 
 This version keeps **every requirement and pass condition** from the brief, but uses fewer moving parts:
 
@@ -486,7 +486,9 @@ src/codeforge/
   policy.py        # evaluate_code_policy() and its allow / approval / deny lists
   escalation.py    # should_escalate(), priority_for()
   sandbox.py       # run_in_sandbox()
-  models.py        # make_chat, RuleBasedChat, ask_model (retry, breaker, backup, template), Chaos
+  models.py        # make_chat, ask_model (retry, breaker, backup, template), Chaos
+  brain.py         # RuleBasedChat: the offline rule-based brain
+  evals.py         # golden-set checks used by the gate, the UI and the cost script
   templates.py     # template library
   cache.py         # SemanticCache, guard words, threshold_sweep
   cost.py          # Meter callback, cost table
@@ -495,6 +497,7 @@ src/codeforge/
   sql_agent.py     # sample DB, validate_sql(), run_sql()
   cli.py           # codeforge-demo, codeforge-chaos, codeforge-cost, codeforge-flywheel
   ui/app.py        # Gradio layout and handlers
+  ui/views.py      # HTML for the stepper, chips and badges (display only)
   ui/style.css
 evals/golden_set.json
 evals/reference/test_ref_*.py      # hidden tests

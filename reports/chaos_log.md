@@ -2,7 +2,7 @@
 
 Provider: `offline` · chaos rate: **60%** of primary/backup model calls fail with 429 · seed 7
 
-**Answered: 20 of 20.** Injected failures: 78. Simulated retry waiting (full jitter): 24.9 s. Tiers that wrote the code: {'template': 10, 'primary': 8, 'backup': 2}.
+**Answered: 20 of 20.** Injected failures: 78. Simulated retry waiting (full jitter): 24.2 s. Tiers that wrote the code: {'template': 10, 'primary': 8, 'backup': 2}.
 
 ## 20 requests under chaos
 

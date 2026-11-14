@@ -97,7 +97,7 @@ NEGATIVE_WORDS = ("not working", "doesn't work", "does not work", "still failing
 URGENT_WORDS = ("deadline", "due tonight", "tonight", "asap", "urgent", "right now", "in 10 minutes",
                 "immediately", "minutes left")
 HUMAN_RE = re.compile(r"\b(human|person|agent|someone real|mentor|teaching assistant|real teacher)\b", re.I)
-SQL_RE = re.compile(r"\b(sql|select|query|table|database|sales|employees|revenue|join)\b", re.I)
+SQL_RE = re.compile(r"\b(sql|select|query|table|database|sales|employees|users?|emails?|revenue|join|how many|average|records|rows)\b", re.I)
 OTHER_LANG_RE = re.compile(r"\b(javascript|typescript|java|c\+\+|rust|golang|ruby|php|kotlin|swift|c#)\b", re.I)
 CODE_RE = re.compile(r"\b(function|def|write|implement|return|code|program|python|script|check|compute|"
                      r"calculate|convert|sort|count|list|string|number)\b", re.I)
