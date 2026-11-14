@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CodeForge local data (never commit)
+.DS_Store
+data/
+*.db
+reports/_tmp/
