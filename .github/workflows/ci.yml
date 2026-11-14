@@ -1,0 +1,21 @@
+# The golden gate in CI. Runs with NO API key (offline brain + template tier).
+name: golden-gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync
+      - name: Golden gate + rule tests
+        env:
+          MODEL_PROVIDER: offline
+        run: uv run pytest -rA
