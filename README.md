@@ -1,2 +1,2 @@
 # Codeforge
-A platform to genearte code 
+A platform to genearte code for any ask
