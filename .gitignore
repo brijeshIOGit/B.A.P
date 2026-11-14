@@ -224,3 +224,6 @@ __marimo__/
 data/
 *.db
 reports/_tmp/
+
+# local editor / agent settings
+.claude/

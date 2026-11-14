@@ -1,0 +1,56 @@
+/* CodeForge UI: built on Gradio's theme variables so light and dark mode both work. */
+:root {
+  --cf-ok: #16a34a; --cf-warn: #d97706; --cf-alert: #dc2626; --cf-info: #4f46e5; --cf-muted: #64748b;
+  --cf-ok-bg: rgba(22, 163, 74, .12); --cf-warn-bg: rgba(217, 119, 6, .14); --cf-alert-bg: rgba(220, 38, 38, .12);
+  --cf-info-bg: rgba(79, 70, 229, .12); --cf-muted-bg: rgba(100, 116, 139, .12);
+}
+.gradio-container { max-width: 1440px !important; }
+
+.cf-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 18px; border: 1px solid var(--border-color-primary); border-radius: 10px;
+  background: var(--background-fill-secondary); }
+.cf-brand { display: flex; gap: 12px; align-items: center; }
+.cf-logo { font-size: 28px; }
+.cf-name { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.cf-tagline { font-size: 13px; color: var(--body-text-color-subdued); }
+.cf-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.cf-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
+.cf-chip-ok { color: var(--cf-ok); background: var(--cf-ok-bg); }
+.cf-chip-warn { color: var(--cf-warn); background: var(--cf-warn-bg); }
+.cf-chip-alert { color: var(--cf-alert); background: var(--cf-alert-bg); }
+.cf-chip-info { color: var(--cf-info); background: var(--cf-info-bg); }
+.cf-chip-muted { color: var(--cf-muted); background: var(--cf-muted-bg); }
+
+.cf-progress { height: 6px; border-radius: 3px; background: var(--cf-muted-bg); overflow: hidden; margin-bottom: 10px; }
+.cf-bar { height: 100%; background: var(--cf-info); transition: width .35s ease; }
+.cf-stepper { display: flex; flex-direction: column; gap: 2px; }
+.cf-step { display: grid; grid-template-columns: 26px 140px 1fr; align-items: center; gap: 6px;
+  padding: 5px 8px; border-radius: 6px; transition: all .25s ease; font-size: 14px; }
+.cf-dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
+  font-weight: 700; color: var(--cf-muted); background: var(--cf-muted-bg); transition: all .25s ease; }
+.cf-detail { font-size: 12px; color: var(--body-text-color-subdued); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cf-done .cf-dot { color: #fff; background: var(--cf-ok); }
+.cf-failed .cf-dot, .cf-denied .cf-dot { color: #fff; background: var(--cf-alert); }
+.cf-failed .cf-detail, .cf-denied .cf-detail { color: var(--cf-alert); }
+.cf-waiting { background: var(--cf-warn-bg); }
+.cf-waiting .cf-dot { color: #fff; background: var(--cf-warn); }
+.cf-running .cf-dot { color: #fff; background: var(--cf-info); animation: cf-pulse 1s ease-in-out infinite; }
+.cf-skipped { opacity: .4; }
+.cf-skipped .cf-label { text-decoration: line-through; }
+.cf-badge-mini { margin-left: 6px; font-size: 11px; color: var(--cf-warn); }
+@keyframes cf-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, .5); } 50% { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); } }
+@media (prefers-reduced-motion: reduce) { .cf-running .cf-dot { animation: none; } .cf-bar, .cf-step { transition: none; } }
+
+.cf-card { padding: 12px 14px; border: 1px solid var(--border-color-primary); border-radius: 8px; }
+.cf-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cf-list { margin: 8px 0 0 18px; }
+.cf-note { font-size: 13px; color: var(--body-text-color-subdued); word-break: break-word; }
+.cf-empty { padding: 18px; text-align: center; color: var(--body-text-color-subdued); font-size: 13px;
+  border: 1px dashed var(--border-color-primary); border-radius: 8px; }
+.cf-gate { display: flex; flex-wrap: wrap; gap: 6px; }
+
+#cf-approval { border: 2px solid var(--cf-warn) !important; background: var(--cf-warn-bg) !important; border-radius: 10px; }
+#cf-approval h3 { color: var(--cf-warn); margin: 0; }
+.cf-examples button { font-size: 13px !important; }
