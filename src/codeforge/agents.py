@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from .config import PROVIDER, SETTINGS
 from .brain import guess_function_name, rule_requirements, rule_route, rule_sql, rule_triage
-from .cache import CACHE, is_cacheable
+from .cache import CACHE, is_shareable
 from .db import create_ticket, find_run, log_event, quota_left, save_run, who_is
 from .escalation import (REASON_CANNOT_GENERATE, REASON_DENIALS, REASON_REPAIRS, denials_need_human,
                          next_unhappy_streak, priority_for, repairs_need_human, should_escalate)
@@ -100,7 +100,7 @@ SUMMARY_PROMPT = "Summarise this coding-help chat in 3 short sentences. Keep tas
 
 # Fields that belong to one turn. guard_in resets them at the start of every message.
 TURN_RESET = {"request": "", "pii_found": [], "blocked": "", "triage": {}, "escalate_reason": "", "route": "",
-              "requirements": {}, "code": "", "tests": "", "served_by": {}, "cache_hit": "", "policy": {},
+              "requirements": {}, "code": "", "tests": "", "served_by": {}, "cache_hit": "", "cache_source": "", "policy": {},
               "approved": False, "run": {}, "attempts": 0, "repair": False, "refusal": {}, "ticket": {},
               "sql": {}, "answer": "", "quota_left": 0}
 
@@ -188,19 +188,24 @@ def triage(state, config):
 
 
 def cache_lookup(state, config):
-    """Reuse code + tests: same user repeating a request, or a similar request (R4)."""
+    """Reuse code + tests: the same user repeating a request, or another user's SAME plain problem (R4)."""
     if not SETTINGS["use_cache"]:
         return {}
     user_id, _ = who_is(config)
-    payload, kind = CACHE.find_repeat(user_id, state["request"]), "repeat"
-    if payload is None and is_cacheable(state["request"], state.get("pii_found", [])):
-        payload, kind = CACHE.lookup(state["request"]), "semantic"
+    request = state["request"]
+    if config.get("configurable", {}).get("fresh"):
+        CACHE.forget(user_id, request)  # "Regenerate fresh": do not trust the cache for this request
+        log_event("cache_skipped", user=user_id, reason="regenerate fresh")
+        return {}
+    payload, kind = CACHE.find_repeat(user_id, request), "repeat"
+    if payload is None and is_shareable(request, state.get("pii_found", [])):
+        payload, kind = CACHE.lookup(request), "semantic"
     if payload is None:
         return {}
     log_event("cache_hit", kind=kind, user=user_id)
-    return {"cache_hit": kind, "requirements": payload["requirements"], "code": payload["code"],
-            "tests": payload["tests"], "served_by": {**state.get("served_by", {}), "code_gen": "cache",
-                                                     "test_gen": "cache"}}
+    return {"cache_hit": kind, "cache_source": payload.get("matched", ""), "requirements": payload["requirements"],
+            "code": payload["code"], "tests": payload["tests"],
+            "served_by": {**state.get("served_by", {}), "code_gen": "cache", "test_gen": "cache"}}
 
 
 def router(state, config):
@@ -357,7 +362,8 @@ def report(state, config):
     if run.get("reused"):
         lines.append("↻ Same code and tests as an earlier run: reused that result, nothing was executed again.")
     if state.get("cache_hit"):
-        lines.append(f"♻ Code and tests came from the {state['cache_hit']} cache; the policy gate still checked them.")
+        lines.append(f"♻ Code and tests came from the {state['cache_hit']} cache; the policy gate still checked them. "
+                     f"Not what you asked? Use “Regenerate fresh” or 👎.")
     if state.get("attempts"):
         lines.append(f"Repairs used: {state['attempts']} of {SETTINGS['max_repairs']}.")
     passed = run.get("exit_code") == 0
@@ -367,8 +373,8 @@ def report(state, config):
         payload = {"requirements": req, "code": state["code"], "tests": state["tests"]}
         CACHE.remember_repeat(user_id, state["request"], payload)
         if SETTINGS["use_cache"] and state.get("cache_hit") != "semantic" and \
-                is_cacheable(state["request"], state.get("pii_found", [])):
-            CACHE.store(state["request"], payload)
+                is_shareable(state["request"], state.get("pii_found", [])):
+            CACHE.store(state["request"], payload)  # only plain requests are shared with other users
     elif not run.get("timed_out") and repairs_need_human(state.get("attempts", 0), SETTINGS["max_repairs"], passed):
         update["escalate_reason"] = REASON_REPAIRS
         lines.append("I could not fix it in two repairs, so I am handing this to a person.")

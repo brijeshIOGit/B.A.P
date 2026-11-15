@@ -87,9 +87,9 @@ Full design, every node's What/When/Why/How: [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Results (offline, no API key)
 
-* `uv run pytest`: **all tests pass** (see [`reports/gate_output.txt`](reports/gate_output.txt)); hard golden cases 100%, soft 100%.
+* `uv run pytest`: **all 149 tests pass** (see [`reports/gate_output.txt`](reports/gate_output.txt)); hard golden cases 100%, soft 100%.
 * Chaos at 60%: **20 of 20 answered**, each naming its tier ([`reports/chaos_log.md`](reports/chaos_log.md)).
-* Cost: **44% cheaper** with the same golden pass rate ([`reports/cost_table.md`](reports/cost_table.md)).
+* Cost: **41% cheaper** with the same golden pass rate ([`reports/cost_table.md`](reports/cost_table.md)).
 * SQL: 10 standard + 5 own attacks blocked; CTE, UNION and JOIN allowed; `LIMIT 10000000` clamped to 1000.
 * Red → green: move `"os"` from `DENY_IMPORTS` to `ALLOW_IMPORTS` in `policy.py` → `FAILED tests/test_gate.py::test_hard_case[H-policy-deny-os]`; undo → green.
 
@@ -109,8 +109,10 @@ Built solo; presented as the four roles from the brief.
 1. **The degraded tier fails closed.** When models fail we fall back to hand-written templates, then to an honest
    "cannot generate now" plus a ticket. We never invent code, and no tier can change a policy verdict or approve risky
    code: a backup model's file-access code still waits for an instructor (`H-degraded-no-auto-approve`).
-2. **A cache hit skips the models, never the gate.** The cache stores code and tests, not results. Every hit still goes
-   through `policy_gate` and `run_tests`, so a stale or poisoned entry can never run unchecked or fake a pass.
+2. **The shared cache reuses only the same plain problem, and never skips the gate.** Another user's code is reused
+   only for a short request with no extra rules, the same guard words (`asc`/`desc`, numbers…) and the same meaningful
+   words. "…palindrome and returns yes or no" never gets the True/False version. 🔄 Regenerate fresh skips the cache,
+   and a 👎 on a cached answer removes it and blocks that pair. Every hit still goes through `policy_gate` and `run_tests`.
 3. **Rules are plain Python with tests; the model only fills fields.** Policy lists, escalation rules, priority/SLA,
    quota, cache guard words, SQL allow-lists and the report wording are all code, covered by the golden gate. Weaken
    one and a named test fails; a prompt change cannot quietly loosen safety.

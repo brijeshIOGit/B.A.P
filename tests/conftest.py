@@ -27,9 +27,11 @@ def fresh_system(tmp_path):
     """Every test starts with an empty database, cache, breakers and chaos switch."""
     saved = copy.deepcopy(config.SETTINGS)
     config.SETTINGS["sample_db_path"] = str(tmp_path / "sample.db")
+    config.SETTINGS["cache_blocked_path"] = str(tmp_path / "cache_blocked_pairs.json")
     db.init_db(str(tmp_path / "codeforge.db"))
     db.EVENTS.clear()
     cache.CACHE.clear()
+    cache.CACHE.blocked.clear()
     models.reset_resilience()
     config.SLEEP = lambda seconds: None  # retries do not really wait in tests
     yield

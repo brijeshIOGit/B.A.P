@@ -389,12 +389,17 @@ A dict of known tasks, each with `keywords`, `requirements`, `code` and `tests`:
 ### 5.5 Metering, cascade and semantic cache
 - **Meter** (`cost.py`, a LangChain `BaseCallbackHandler` from the notebook): records tokens, seconds and dollars per agent.
 - **Cascade:** small model for `triage, router, requirements, ticket` (and compaction); big model for `code_gen, test_gen, sql_agent`.
-- **Semantic cache** (`cache.py`):
-  - only for `python_function` requests with no PII, no personal words (`my`, `this`, `fix`, `previous`, …), and a **passing** run;
-  - a hit needs similarity ≥ threshold **and** the same guard words (`ascending/descending, min/max, even/odd, first/last, recursive/iterative, reverse, unique, case`, … and every number). So "sort ascending" never matches "sort descending";
-  - TTL 1 hour;
-  - stores code + tests only, never a run result;
-  - embeddings: `all-MiniLM-L6-v2`, or `HashingEmbeddings` when offline. The threshold is picked with `threshold_sweep` over 12+ labelled request pairs: 0 false hits, at least 3 hits.
+- **Cache** (`cache.py`), two layers:
+  - **Repeat** (same user, same masked text, 10 min): always safe; stored for every passing run.
+  - **Shared / semantic** (any user, 1 h): reuses another user's code + tests only through four locks:
+    1. **plain request**: no PII, no personal words (`my`, `this`, `fix`…), no extra-rule connectors (`and`, `but`, `except`, `treat`, quotes…), at most 6 meaningful words;
+    2. **same guard words** (`asc/desc`, `min/max`, `even/odd`, `first/last`, `recursive/iterative`, `case`, … and every number);
+    3. **same detail words**: every meaningful word matches, only filler (`write`, `python`, `function`, `check`, `whether`…) may differ;
+    4. **similarity ≥ threshold** on the embeddings.
+  - Why: a program has many variants. "…palindrome **and returns yes or no**" must never get the True/False version, because cached tests always agree with cached code, so the sandbox cannot catch a wrong reuse.
+  - Escape hatches: **🔄 Regenerate fresh** (`config.fresh`) skips and clears the cache for that request; a **👎 on a cached answer** removes the entry and records the pair in `evals/cache_blocked_pairs.json` so it never matches again.
+  - Stores code + tests only, never a run result; every hit still passes the policy gate and the sandbox.
+  - Embeddings: `all-MiniLM-L6-v2`, or `HashingEmbeddings` offline. 20 labelled pairs (6 "same topic, one extra rule" negatives): 0 false hits, 6 true hits. Hard golden case `H-cache-no-false-reuse`.
 - **Cost table** (`uv run codeforge-cost`): the same 20 requests run twice, *before* (big model everywhere, no cache) and *after* (cascade + cache + compaction). Saved to `reports/cost_table.md` with the golden pass rate for both. Target: ≥ 30% cheaper, same pass rate.
 
 ### 5.6 Chat compaction

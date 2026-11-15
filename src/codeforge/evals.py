@@ -227,6 +227,19 @@ def check_pipeline_passes(case, app):
     return True, "passed"
 
 
+def check_cache_no_false_hit(case, app):
+    """No 'same topic, different rule' pair may share a cache entry; true paraphrases still do."""
+    from .cache import LABELLED_PAIRS, SemanticCache, is_shareable
+
+    cache = SemanticCache()
+    pairs = list(LABELLED_PAIRS) + [(p["a"], p["b"], False) for p in case["input"].get("pairs", [])]
+    false_hits = [f"{a!r} ~ {b!r}" for a, b, same in pairs
+                  if not same and is_shareable(b, []) and cache.same_problem(a, b)]
+    true_hits = sum(1 for a, b, same in pairs if same and cache.same_problem(a, b))
+    ok = not false_hits and true_hits >= case["expect"].get("min_true_hits", 3)
+    return ok, f"false hits={false_hits} true hits={true_hits}"
+
+
 CHECKS = {
     "policy": check_policy, "mask": check_mask, "pipeline": check_pipeline, "route": check_route,
     "requirements": check_requirements, "identity_claim": check_identity_claim,
@@ -234,6 +247,7 @@ CHECKS = {
     "idempotent": check_idempotent, "approval": check_approval, "timeout": check_timeout,
     "report_honesty": check_report_honesty, "degraded_no_auto_approve": check_degraded_no_auto_approve,
     "reference": check_reference, "pipeline_passes": check_pipeline_passes,
+    "cache_no_false_hit": check_cache_no_false_hit,
 }
 
 

@@ -93,6 +93,8 @@ SETTINGS = {
     "embeddings": _env("CODEFORGE_EMBEDDINGS", "hash"),
     "db_path": str(DATA_DIR / "codeforge.db"),
     "sample_db_path": str(DATA_DIR / "sample.db"),
+    # Request pairs a thumbs-down said must never share a cache entry (also used as test data).
+    "cache_blocked_path": str(EVALS_DIR / "cache_blocked_pairs.json"),
     # Production levers (R4). The cost script turns these off for the "before" run.
     "use_cache": True,
     "cascade": True,

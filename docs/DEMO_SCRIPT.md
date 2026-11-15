@@ -53,7 +53,10 @@ One rule: the model supplies judgement, plain Python makes the decision." Point 
 2. The counter climbs to **20/20 answered**; the table names the tier for each one (primary / backup / template).
 3. Tick **Simulate total outage**, then type "write a function to check if a sentence is a pangram":
    honest "Cannot generate now" + a P3 ticket. Untick the outage.
-4. Show `reports/chaos_log.md` and `reports/cost_table.md` (44% cheaper, same golden pass rate).
+4. Show `reports/chaos_log.md` and `reports/cost_table.md` (41% cheaper, same golden pass rate).
+5. Cache, safely: as `u_alice` send the 🟢 Palindrome example; switch to `u_bob` and send "Write a python function to
+   check whether a string is a palindrome" → ♻ reused. Then send "…is a palindrome and returns yes or no" → fresh
+   code (an extra rule is never shared). Click 🔄 Regenerate fresh to skip the cache on demand.
 
 ## 6:30 – 8:30 · The gate goes red, then green (Quality owner)
 

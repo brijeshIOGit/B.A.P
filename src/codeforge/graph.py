@@ -36,6 +36,7 @@ class CodeForgeState(TypedDict, total=False):
     tests: str
     served_by: dict
     cache_hit: str
+    cache_source: str
     policy: dict
     approved: bool
     run: dict

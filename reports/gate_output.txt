@@ -1,16 +1,23 @@
-........................................................................ [ 50%]
-......................................................................   [100%]
+........................................................................ [ 48%]
+........................................................................ [ 96%]
+.....                                                                    [100%]
 ==================================== PASSES ====================================
 =========================== short test summary info ============================
 PASSED tests/test_cache.py::test_labelled_pairs_are_enough
 PASSED tests/test_cache.py::test_chosen_threshold_has_no_false_hits_and_at_least_three_hits
-PASSED tests/test_cache.py::test_without_guard_words_there_would_be_false_hits
+PASSED tests/test_cache.py::test_without_the_locks_there_would_be_false_hits
+PASSED tests/test_cache.py::test_chat1_plain_paraphrase_is_reused
+PASSED tests/test_cache.py::test_chat5_extra_output_rule_is_not_reused
+PASSED tests/test_cache.py::test_chat6_extra_rule_is_not_reused
 PASSED tests/test_cache.py::test_sort_ascending_never_matches_sort_descending
-PASSED tests/test_cache.py::test_paraphrase_hits
+PASSED tests/test_cache.py::test_detail_words_ignore_filler_only
 PASSED tests/test_cache.py::test_numbers_are_guard_terms
-PASSED tests/test_cache.py::test_personal_or_pii_requests_are_not_cacheable
+PASSED tests/test_cache.py::test_personal_pii_or_specific_requests_are_not_shared
 PASSED tests/test_cache.py::test_entries_expire_after_the_ttl
 PASSED tests/test_cache.py::test_repeat_cache_is_per_user
+PASSED tests/test_cache.py::test_thumbs_down_removes_the_entry_and_blocks_the_pair
+PASSED tests/test_cache.py::test_regenerate_fresh_skips_the_cache
+PASSED tests/test_cache.py::test_other_users_get_a_plain_request_from_the_shared_cache
 PASSED tests/test_escalation.py::test_calm_request_does_not_escalate
 PASSED tests/test_escalation.py::test_asking_for_a_human_escalates
 PASSED tests/test_escalation.py::test_angry_user_escalates
@@ -44,6 +51,7 @@ PASSED tests/test_gate.py::test_hard_case[H-idempotent-twice]
 PASSED tests/test_gate.py::test_hard_case[H-timeout-killed]
 PASSED tests/test_gate.py::test_hard_case[H-report-honesty]
 PASSED tests/test_gate.py::test_hard_case[H-degraded-no-auto-approve]
+PASSED tests/test_gate.py::test_hard_case[H-cache-no-false-reuse]
 PASSED tests/test_gate.py::test_soft_cases_pass_rate
 PASSED tests/test_graph.py::test_student_a_gets_code_tests_and_a_passing_run
 PASSED tests/test_graph.py::test_level1_list_tuple_example_passes
@@ -144,4 +152,4 @@ PASSED tests/test_sql.py::test_huge_limit_is_clamped_not_passed
 PASSED tests/test_sql.py::test_missing_limit_is_added
 PASSED tests/test_sql.py::test_read_only_connection_refuses_writes_even_if_validation_were_skipped
 PASSED tests/test_sql.py::test_users_table_cannot_be_read_even_if_validation_were_skipped
-142 passed in 12.22s
+149 passed in 12.69s

@@ -229,6 +229,17 @@ def decide(approved: bool, approver: str, ui: dict):
     yield from _drive(ui, Command(resume={"approved": approved}), cfg)
 
 
+def regenerate(ui: dict):
+    """Send the last request again without using the cache."""
+    request = ui["last"].get("request", "")
+    if not request:
+        yield render(ui)
+        return
+    gr.Info("Regenerating without the cache.")
+    ui["steps"], ui["last"] = views.new_steps(), {}
+    yield from _drive(ui, {"messages": [HumanMessage(content=request)]}, _cfg(ui, fresh=True))
+
+
 def approve(approver: str, ui: dict):
     yield from decide(True, approver, ui)
 
@@ -282,7 +293,12 @@ def thumbs(up: bool, comment: str, ui: dict):
     fid = db.save_feedback(ui["user"], last.get("request", ""), last.get("code", ""), last.get("answer", ""),
                            comment or "answer was wrong")
     ui["feedback_id"] = fid
-    return f"👎 Saved feedback #{fid}. An instructor can turn it into a golden case.", gr.update(visible=True)
+    note = ""
+    if last.get("cache_hit"):
+        # A bad reuse: remove the entry and block this pair so it never matches again.
+        CACHE.report_bad_hit(ui["user"], last.get("request", ""), last.get("cache_source", ""), last["cache_hit"])
+        note = " The cached answer was removed and this pair is blocked; press 🔄 Regenerate fresh."
+    return f"👎 Saved feedback #{fid}.{note} An instructor can turn it into a golden case.", gr.update(visible=True)
 
 
 def export_case(ui: dict) -> str:
@@ -383,6 +399,7 @@ def build_ui() -> gr.Blocks:
                 with gr.Row():
                     up_btn = gr.Button("👍", size="sm", scale=0)
                     down_btn = gr.Button("👎", size="sm", scale=0)
+                    regen_btn = gr.Button("🔄 Regenerate fresh", size="sm", scale=0)
                     comment = gr.Textbox(placeholder="What was wrong? (for 👎)", show_label=False, scale=4)
                 feedback_md = gr.Markdown()
                 export_btn = gr.Button("Export 👎 as a golden case", size="sm", visible=False)
@@ -430,6 +447,7 @@ def build_ui() -> gr.Blocks:
         reset_btn.click(reset_everything, [ui], outputs + [chaos_on, outage])
         reset_quota_btn.click(reset_quota, [ui], outputs)
         lookup_btn.click(lookup_run, [run_id, ui], lookup_md)
+        regen_btn.click(regenerate, [ui], outputs)
         up_btn.click(lambda c, u: thumbs(True, c, u), [comment, ui], [feedback_md, export_btn])
         down_btn.click(lambda c, u: thumbs(False, c, u), [comment, ui], [feedback_md, export_btn])
         export_btn.click(export_case, [ui], feedback_md)

@@ -29,6 +29,16 @@ Every default chosen during the build, with the reason. Newest at the bottom of 
 - When `code_gen` falls back to the template tier, the requirements and tests are taken from the same template, so code and tests always share one contract.
 - The policy treats `io` and `csv` as file access (needs approval). `list.remove` stays allowed; `os.remove` is blocked because `os` is denied.
 - "Personal words" that make a request uncacheable: `my, mine, our, this, above, previous, earlier, again, fix` and pasted code blocks. Ordinary words like "that" and "it" were removed after they blocked normal requests from the cache.
+- **Cache redesign (after the "multiple faces of a program" review).** The first version could reuse Alice's
+  `is_palindrome` (True/False) for Bob's "…palindrome and returns yes or no": the extra rule was not a guard word,
+  and cached tests always agree with cached code, so the report would say "passed" for the wrong spec. Fixes:
+  (1) **detail words**: every meaningful word must match, only filler may differ; (2) **plain-only sharing**:
+  requests with connectors (`and`, `but`, `treat`, quotes…) or more than 6 detail words are never shared across
+  users (the same user's repeat cache still works); (3) **🔄 Regenerate fresh** button (`config.fresh`) skips and
+  clears the cache for that request; (4) **👎 on a cached answer** removes the entry and writes the pair to
+  `evals/cache_blocked_pairs.json`, so it can never match again (a cache flywheel). Labelled pairs grew from 14 to
+  20 (6 new "same topic, one extra rule" negatives). New hard golden case `H-cache-no-false-reuse`. Cost saving
+  went from 44% to 41%, golden pass rate unchanged.
 - Cache threshold for the offline hashing embeddings: 0.6 (sweep: 6/6 true hits, 0/8 false hits with guard words; without guard words there are false hits).
 - Escalation rule "two policy denials" lives in `refuse` (it is raised the moment the second denial happens), not in `triage`, so a chat is not escalated again on every later message.
 - The repeat cache and semantic cache can both be switched off (`SETTINGS["use_cache"]`) for the cost "before" run. Idempotency still holds without them, because the run key is a hash of user + code + tests.
