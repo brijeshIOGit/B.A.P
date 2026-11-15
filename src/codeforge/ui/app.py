@@ -21,6 +21,7 @@ from ..cache import CACHE
 from ..cli import CHAOS_REQUESTS, export_feedback
 from ..cost import Meter
 from ..graph import get_app, make_config, user_input
+from ..masking import mask_text
 from ..models import BREAKERS, CHAOS, reset_resilience
 from . import views
 
@@ -205,7 +206,7 @@ def _drive(ui: dict, graph_input, cfg: dict):
                 ui["steps"]["detail"]["human_approval"] = "waiting for an instructor · nothing has run"
                 continue
             _note_update(ui, node, update or {})
-            if node == "guard_in":
+            if node == "guard_in" and not ui.pop("user_shown", False):
                 ui["chat"].append({"role": "user", "content": update.get("request", "")})
         yield render(ui)
     last = ui["last"]
@@ -227,11 +228,19 @@ def _drive(ui: dict, graph_input, cfg: dict):
 
 OUTPUT_COUNT = 20  # how many values render() returns (checked when the layout is built)
 
+def take_message(message: str):
+    """Runs instantly on Send / Enter: empty the box and hand the text to send()."""
+    return "", message
+
+
 def send(message: str, ui: dict):
     if not (message or "").strip():
         yield render(ui)
         return
     ui["steps"], ui["last"] = views.new_steps(), {}
+    # Show the question in the chat at once (masked, like everything else), then run the graph.
+    ui["chat"].append({"role": "user", "content": mask_text(message)})
+    ui["user_shown"] = True
     yield from _drive(ui, user_input(message), _cfg(ui))
 
 
@@ -480,6 +489,7 @@ def build_ui() -> gr.Blocks:
     db.init_db()
     with gr.Blocks(title="CodeForge") as demo:
         ui = gr.State(new_session())
+        pending = gr.State("")  # the question being sent, so the text box can clear at once
 
         with gr.Sidebar(label="Ops", open=False, width=340):
             gr.Markdown("### 👤 Signed-in user\nIdentity comes from here, never from the chat.")
@@ -572,10 +582,11 @@ def build_ui() -> gr.Blocks:
         assert len(outputs) == OUTPUT_COUNT
 
         demo.load(render, [ui], outputs)
-        send_btn.click(send, [msg, ui], outputs).then(lambda: "", None, msg)
-        msg.submit(send, [msg, ui], outputs).then(lambda: "", None, msg)
+        # Clear the box instantly (queue=False), then stream the graph for the pending question.
+        send_btn.click(take_message, [msg], [msg, pending], queue=False).then(send, [pending, ui], outputs)
+        msg.submit(take_message, [msg], [msg, pending], queue=False).then(send, [pending, ui], outputs)
         for button, text in example_buttons:
-            button.click(lambda t=text: t, None, msg).then(send, [msg, ui], outputs).then(lambda: "", None, msg)
+            button.click(lambda t=text: ("", t), None, [msg, pending], queue=False).then(send, [pending, ui], outputs)
         approve_btn.click(approve, [ui], outputs)
         reject_btn.click(reject, [ui], outputs)
         # Every 2 s: a student's paused chat picks up an instructor's decision from another tab,
