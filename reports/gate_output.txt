@@ -1,6 +1,6 @@
-........................................................................ [ 48%]
-........................................................................ [ 96%]
-.....                                                                    [100%]
+........................................................................ [ 47%]
+........................................................................ [ 95%]
+.......                                                                  [100%]
 ==================================== PASSES ====================================
 =========================== short test summary info ============================
 PASSED tests/test_cache.py::test_labelled_pairs_are_enough
@@ -84,6 +84,8 @@ PASSED tests/test_masking.py::test_code_keeps_example_emails_but_masks_secrets
 PASSED tests/test_masking.py::test_luhn
 PASSED tests/test_models.py::test_transient_errors_are_recognised
 PASSED tests/test_models.py::test_normal_call_is_served_by_primary
+PASSED tests/test_models.py::test_small_and_big_gpt_oss_back_each_other_up
+PASSED tests/test_models.py::test_one_model_down_only_affects_that_model
 PASSED tests/test_models.py::test_primary_down_falls_back_to_backup
 PASSED tests/test_models.py::test_total_outage_uses_the_template_tier
 PASSED tests/test_models.py::test_unknown_task_in_outage_gets_no_invented_code
@@ -152,4 +154,4 @@ PASSED tests/test_sql.py::test_huge_limit_is_clamped_not_passed
 PASSED tests/test_sql.py::test_missing_limit_is_added
 PASSED tests/test_sql.py::test_read_only_connection_refuses_writes_even_if_validation_were_skipped
 PASSED tests/test_sql.py::test_users_table_cannot_be_read_even_if_validation_were_skipped
-149 passed in 12.69s
+151 passed in 13.02s

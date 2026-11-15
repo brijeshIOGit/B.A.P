@@ -191,7 +191,7 @@ def check_report_honesty(case, app):
 
 
 def check_degraded_no_auto_approve(case, app):
-    CHAOS.configure(rate=1.0, tiers=("primary",))
+    CHAOS.configure(rate=1.0, models=(config.MODELS["big"],))  # the big model is down
     try:
         user, thread = _new_user(), _thread()
         state = chat(app, case["input"]["text"], user_id=user, thread=thread)

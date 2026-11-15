@@ -192,7 +192,7 @@ def chaos(argv: list | None = None) -> None:
             outage_rows.append(row)
 
         BREAKERS.clear()  # the outage opened every breaker; start this check from a clean state
-        CHAOS.configure(rate=1.0, tiers=("primary",))
+        CHAOS.configure(rate=1.0, models=(config.MODELS["big"],))  # the big model is down
         risky = chat(app, "write a function that reads a file and counts lines", "u_degraded", "degraded-risky")
         CHAOS.configure(0.0)
     finally:
@@ -213,7 +213,7 @@ def chaos(argv: list | None = None) -> None:
         "Template tasks still return code and tests. Unknown tasks get an honest refusal plus a ticket; "
         "no code is invented.", "", pd.DataFrame(outage_rows).to_markdown(index=False), "",
         "## The degraded tier never auto-approves risky code", "",
-        f"Primary model down, request needs file access: served by "
+        f"Big model down, request needs file access: served by "
         f"`{risky.get('served_by', {}).get('code_gen')}`, paused for approval: **{is_paused(risky)}**, "
         f"runs executed: **{len(db.my_runs({'configurable': {'user_id': 'u_degraded'}}))}**. "
         "An instructor must still resume the graph.", "",

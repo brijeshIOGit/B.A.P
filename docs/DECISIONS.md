@@ -14,6 +14,14 @@ Every default chosen during the build, with the reason. Newest at the bottom of 
 
 ## Environment
 
+- **Models: Groq + open-weight gpt-oss only (your decision, same as the bootcamp notebook).** `.env` sets
+  `MODEL_PROVIDER=groq`, big `openai/gpt-oss-120b`, small and backup `openai/gpt-oss-20b`. Because the circuit
+  breaker is per model, a backup equal to the primary would be useless, so **the two sizes back each other up**:
+  small tasks fall back to 120b, big tasks to 20b (`models._tiers`). If `GROQ_API_KEY` is empty, start-up prints a
+  warning and runs offline instead of failing every call. The chaos switch can now fail one named model
+  (`CHAOS.configure(models=…)`), which is how Groq rate limits really behave; `H-degraded-no-auto-approve` uses
+  "the 120b model is down". The xAI / OpenAI / Ollama wiring stays in the code but is not used.
+
 - **`OPENAI_API_KEY` is set in your shell environment** (not in a file in this repo). With no Groq/xAI key in `.env`, CodeForge picks OpenAI automatically. One early manual test run did call OpenAI (a few small requests). After that, every manual run used `MODEL_PROVIDER=offline`, and the tests force offline mode. To use Groq or Grok, fill the key in `.env` (or set `MODEL_PROVIDER=groq` / `xai`).
 - Default model names are only defaults: Groq `openai/gpt-oss-120b` (big), `openai/gpt-oss-20b` (small), `llama-3.3-70b-versatile` (backup); xAI `grok-4` / `grok-3-mini` / `grok-3`. Change them in `.env` (`CODEFORGE_BIG_MODEL`, ...). xAI is reached through its OpenAI-compatible endpoint `https://api.x.ai/v1`, so no extra package is needed.
 - Prices in `config.PRICES` are illustrative. The cost table prints the prices it used.

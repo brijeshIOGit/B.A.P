@@ -42,11 +42,12 @@ def detect_provider() -> str:
 # Default model names per provider. Override them in .env (CODEFORGE_BIG_MODEL, ...).
 # "offline" reuses the Groq names as labels so the cost table still has real prices.
 DEFAULT_MODELS = {
-    "groq": {"big": "openai/gpt-oss-120b", "small": "openai/gpt-oss-20b", "backup": "llama-3.3-70b-versatile"},
+    # Groq + open-weight gpt-oss models: the same choice as the bootcamp notebook.
+    "groq": {"big": "openai/gpt-oss-120b", "small": "openai/gpt-oss-20b", "backup": "openai/gpt-oss-20b"},
     "xai": {"big": "grok-4", "small": "grok-3-mini", "backup": "grok-3"},
     "openai": {"big": "gpt-4.1", "small": "gpt-4.1-mini", "backup": "gpt-4.1-mini"},
     "ollama": {"big": "qwen2.5-coder", "small": "llama3.1", "backup": "llama3.1"},
-    "offline": {"big": "openai/gpt-oss-120b", "small": "openai/gpt-oss-20b", "backup": "llama-3.3-70b-versatile"},
+    "offline": {"big": "openai/gpt-oss-120b", "small": "openai/gpt-oss-20b", "backup": "openai/gpt-oss-20b"},
 }
 
 
@@ -73,7 +74,20 @@ PRICES = {
     "gpt-4.1-mini": (0.40, 1.60),
 }
 
-PROVIDER = detect_provider()
+KEY_FOR = {"groq": "GROQ_API_KEY", "xai": "XAI_API_KEY", "openai": "OPENAI_API_KEY"}
+
+
+def usable_provider(provider: str) -> str:
+    """A provider that needs a key but has none falls back to offline, with a clear message."""
+    key = KEY_FOR.get(provider)
+    if key and not _env(key):
+        print(f"[codeforge] MODEL_PROVIDER={provider} but {key} is empty in .env: running OFFLINE "
+              f"(rule-based brain + templates) until you add the key.")
+        return "offline"
+    return provider
+
+
+PROVIDER = usable_provider(detect_provider())
 MODELS = model_names(PROVIDER)
 
 # All the numbers the rules use. Change them here (or in a test) and the whole system follows.

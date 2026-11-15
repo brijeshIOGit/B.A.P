@@ -40,13 +40,17 @@ class Chaos:
     def __init__(self):
         self.configure(0.0)
 
-    def configure(self, rate: float = 0.0, tiers=("primary", "backup"), status: int = 429, seed: int = 7):
-        self.rate, self.tiers, self.status = rate, tiers, status
+    def configure(self, rate: float = 0.0, tiers=("primary", "backup"), status: int = 429, seed: int = 7,
+                  models=None):
+        """models: only fail these model names (e.g. "the 120b model is down"); None = any model."""
+        self.rate, self.tiers, self.status, self.models = rate, tiers, status, models
         self.rng = random.Random(seed)
         self.injected = 0
 
-    def maybe_fail(self, tier: str):
-        """Raise a fake 429 for `rate` of the calls on the chosen tiers."""
+    def maybe_fail(self, tier: str, model: str = ""):
+        """Raise a fake 429 for `rate` of the calls on the chosen tiers (and models, if set)."""
+        if self.models is not None and model not in self.models:
+            return
         if self.rate and tier in self.tiers and self.rng.random() < self.rate:
             self.injected += 1
             raise SimulatedAPIError(self.status)
@@ -176,11 +180,12 @@ def _mask_messages(messages: list) -> list:
 
 def _tiers(size: str) -> list[tuple[str, str]]:
     """[(tier, model)] to try in order. Cascade: small model for easy steps."""
-    if size == "small" and config.SETTINGS["cascade"]:
-        primary = config.MODELS["small"]
-    else:
-        primary = config.MODELS["big"]
-    return [("primary", primary), ("backup", config.MODELS["backup"])]
+    small, big = config.MODELS["small"], config.MODELS["big"]
+    primary = small if (size == "small" and config.SETTINGS["cascade"]) else big
+    backup = config.MODELS["backup"]
+    if backup == primary:  # a backup must be a different model: the two gpt-oss sizes back each other up
+        backup = big if primary == small else small
+    return [("primary", primary), ("backup", backup)]
 
 
 def _try_model(agent, tier, model, messages, schema, check, callbacks):
@@ -191,7 +196,7 @@ def _try_model(agent, tier, model, messages, schema, check, callbacks):
             CALL_LOG.append({"agent": agent, "tier": tier, "model": model, "outcome": "breaker open"})
             return None
         try:
-            CHAOS.maybe_fail(tier)
+            CHAOS.maybe_fail(tier, model)
             llm = make_chat(model)
             runnable = structured(llm, schema) if schema else llm
             run_config = {"callbacks": callbacks, "metadata": {"agent": agent, "tier": tier, "model": model}}

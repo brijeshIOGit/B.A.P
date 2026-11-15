@@ -28,11 +28,10 @@ uv run codeforge-reset     # wipe runs, tickets, feedback, logs (testing)
 uv run codeforge-flywheel --help
 ```
 
-**Model keys** go in `.env` (copy `.env.example`; `.env` is gitignored and never committed):
-`GROQ_API_KEY` (Groq), `XAI_API_KEY` (xAI Grok) or `OPENAI_API_KEY`. The provider is picked from the first key found,
-or forced with `MODEL_PROVIDER=groq|xai|openai|ollama|offline`. Model names: `CODEFORGE_BIG_MODEL`,
-`CODEFORGE_SMALL_MODEL`, `CODEFORGE_BACKUP_MODEL`. Note: a key already exported in your shell is used too; run with
-`MODEL_PROVIDER=offline` to stay offline.
+**Models:** Groq with the open-weight **gpt-oss** models from the bootcamp notebook:
+`openai/gpt-oss-120b` (code and tests) and `openai/gpt-oss-20b` (triage, router, requirements, tickets). The two back
+each other up when one fails. Put your key in `.env` (`GROQ_API_KEY=…`; `.env` is gitignored and never committed).
+With no key, CodeForge says so on start-up and runs offline (rule-based brain + templates).
 
 ## The graph
 
@@ -87,7 +86,7 @@ Full design, every node's What/When/Why/How: [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Results (offline, no API key)
 
-* `uv run pytest`: **all 149 tests pass** (see [`reports/gate_output.txt`](reports/gate_output.txt)); hard golden cases 100%, soft 100%.
+* `uv run pytest`: **all 151 tests pass** (see [`reports/gate_output.txt`](reports/gate_output.txt)); hard golden cases 100%, soft 100%.
 * Chaos at 60%: **20 of 20 answered**, each naming its tier ([`reports/chaos_log.md`](reports/chaos_log.md)).
 * Cost: **41% cheaper** with the same golden pass rate ([`reports/cost_table.md`](reports/cost_table.md)).
 * SQL: 10 standard + 5 own attacks blocked; CTE, UNION and JOIN allowed; `LIMIT 10000000` clamped to 1000.

@@ -20,6 +20,19 @@ def test_normal_call_is_served_by_primary():
     assert tier == "primary" and "def is_palindrome" in answer.code
 
 
+def test_small_and_big_gpt_oss_back_each_other_up(monkeypatch):
+    monkeypatch.setitem(config.MODELS, "backup", config.MODELS["small"])  # notebook setting
+    assert models._tiers("small") == [("primary", config.MODELS["small"]), ("backup", config.MODELS["big"])]
+    assert models._tiers("big") == [("primary", config.MODELS["big"]), ("backup", config.MODELS["small"])]
+
+
+def test_one_model_down_only_affects_that_model():
+    CHAOS.configure(rate=1.0, models=(config.MODELS["big"],))
+    _, tier_small = ask_model("triage", PALINDROME, schema=Triage, size="small")
+    _, tier_big = ask_model("code_gen", PALINDROME, schema=GeneratedCode, size="big")
+    assert tier_small == "primary" and tier_big == "backup"
+
+
 def test_primary_down_falls_back_to_backup():
     CHAOS.configure(rate=1.0, tiers=("primary",))
     answer, tier = ask_model("code_gen", PALINDROME, schema=GeneratedCode, size="big")
