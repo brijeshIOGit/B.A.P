@@ -17,37 +17,39 @@ tests, not prompts. It runs fully locally, and **everything works with no API ke
 
 ## Quick start
 
-### 1. Set up `.env` with your Groq API key (required for real models)
+> [!IMPORTANT]
+> **Before you run anything: create `.env` with a valid Groq API key.**
+>
+> CodeForge uses **Groq** (groq.com, the provider from the bootcamp notebook — not xAI "Grok").
+> Get a key at https://console.groq.com/keys, then:
+>
+> ```bash
+> cp .env.example .env
+> ```
+>
+> Open `.env` and paste your key (no quotes, no spaces around `=`):
+>
+> ```
+> MODEL_PROVIDER=groq
+> GROQ_API_KEY=gsk_your_real_key_here
+> CODEFORGE_BIG_MODEL=openai/gpt-oss-120b
+> CODEFORGE_SMALL_MODEL=openai/gpt-oss-20b
+> CODEFORGE_BACKUP_MODEL=openai/gpt-oss-20b
+> ```
+>
+> **Is it working?**
+> * ✅ Each answer's report says `Provider: groq`.
+> * ⚠️ Start-up prints `GROQ_API_KEY is empty in .env: running OFFLINE` → the key is missing.
+> * ⚠️ A 401 error from Groq → the key is wrong or expired; create a new one.
+> * 🔁 Restart the UI after every `.env` change.
+>
+> No key? Everything still runs offline (rule-based brain + templates), and `uv run pytest` never needs a key.
 
-CodeForge uses **Groq** (groq.com, the provider from the bootcamp notebook, not xAI "Grok"). Create your key at
-https://console.groq.com/keys, then:
+> [!WARNING]
+> `.env` is gitignored and must **never** be committed. Never paste the key into the chat, a commit or a screenshot.
+> If it leaks, revoke it in the Groq console and create a new one.
 
-```bash
-cp .env.example .env       # .env is gitignored: it is never committed
-```
-
-Open `.env` and paste your key (no quotes, no spaces around `=`):
-
-```
-MODEL_PROVIDER=groq
-GROQ_API_KEY=gsk_your_real_key_here
-CODEFORGE_BIG_MODEL=openai/gpt-oss-120b
-CODEFORGE_SMALL_MODEL=openai/gpt-oss-20b
-CODEFORGE_BACKUP_MODEL=openai/gpt-oss-20b
-```
-
-Check it before you start:
-
-* On start-up, a line like `[codeforge] MODEL_PROVIDER=groq but GROQ_API_KEY is empty in .env: running OFFLINE`
-  means the key is missing: fix `.env` and restart.
-* With a valid key, the report under each answer says `Provider: groq`. Restart the UI after any `.env` change.
-* A wrong or expired key shows up as a 401 error from Groq; the answer then falls back to the templates or an
-  honest "cannot generate now". Create a new key and restart.
-* Never paste the key into the chat, a commit, or a screenshot. If it leaks, revoke it in the Groq console.
-
-No key? Everything still runs offline (rule-based brain + templates), and `uv run pytest` never needs a key.
-
-### 2. Install and run
+### Install and run
 
 ```bash
 uv sync                    # install
