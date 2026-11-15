@@ -21,6 +21,12 @@ Every default chosen during the build, with the reason. Newest at the bottom of 
   warning and runs offline instead of failing every call. The chaos switch can now fail one named model
   (`CHAOS.configure(models=…)`), which is how Groq rate limits really behave; `H-degraded-no-auto-approve` uses
   "the 120b model is down". The xAI / OpenAI / Ollama wiring stays in the code but is not used.
+- **Code and tests are requested as plain text, not JSON tool calls (found on the first real Groq run).**
+  "I need palindrom program" failed in test_gen: Groq rejected the forced tool call on both models
+  (gpt-oss-120b: "Tool choice is required, but model did not call a tool"; gpt-oss-20b: "Failed to parse tool call
+  arguments as JSON"). Long code inside JSON is fragile, so `GeneratedCode` / `GeneratedTests` now carry
+  `text_field`, and `models.structured()` asks for one ```python block and extracts it. Other structured calls keep
+  the tool call plus the notebook's `failed_generation` recovery. Verified live: 7/7 tests passed.
 
 - **`OPENAI_API_KEY` is set in your shell environment** (not in a file in this repo). With no Groq/xAI key in `.env`, CodeForge picks OpenAI automatically. One early manual test run did call OpenAI (a few small requests). After that, every manual run used `MODEL_PROVIDER=offline`, and the tests force offline mode. To use Groq or Grok, fill the key in `.env` (or set `MODEL_PROVIDER=groq` / `xai`).
 - Default model names are only defaults: Groq `openai/gpt-oss-120b` (big), `openai/gpt-oss-20b` (small), `llama-3.3-70b-versatile` (backup); xAI `grok-4` / `grok-3-mini` / `grok-3`. Change them in `.env` (`CODEFORGE_BIG_MODEL`, ...). xAI is reached through its OpenAI-compatible endpoint `https://api.x.ai/v1`, so no extra package is needed.

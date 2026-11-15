@@ -11,10 +11,11 @@ ask_model does, in order:
 The chaos switch can fail a share of primary/backup calls on purpose.
 """
 
+import json
 import random
 import re
 
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_core.output_parsers.openai_tools import JsonOutputKeyToolsParser
 from langchain_core.runnables import RunnableLambda
 from langchain_core.utils.function_calling import convert_to_openai_tool
@@ -140,17 +141,68 @@ def _snake(name: str) -> str:
     return re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", name).lower()
 
 
+CODE_BLOCK_RE = re.compile(r"```(?:python|py)?[ \t]*\n(.*?)```", re.S)
+TEXT_MODE_RULE = ("Reply with exactly one ```python code block that contains the whole file, "
+                  "and nothing else: no explanation before or after it.")
+
+
+def extract_code_block(text: str) -> str:
+    """The longest ```python block in a reply (or the whole reply if it has no fence)."""
+    blocks = CODE_BLOCK_RE.findall(text or "")
+    if blocks:
+        return max(blocks, key=len).strip() + "\n"
+    return (text or "").strip() + "\n"
+
+
+def _recover_failed_generation(err, schema):
+    """Groq sends back what the model wrote when it rejects a tool call ('failed_generation').
+    If those arguments still fit the schema, use them instead of failing (from the notebook)."""
+    body = getattr(err, "body", None)
+    if not isinstance(body, dict):
+        return None
+    gen = (body.get("error") or body).get("failed_generation")
+    try:
+        data = json.loads(gen) if isinstance(gen, str) else gen
+        if isinstance(data, list):
+            data = data[0] if data else {}
+        args = data.get("arguments", data.get("parameters", data))
+        args = json.loads(args) if isinstance(args, str) else args
+        return schema.model_validate(args)
+    except Exception:
+        return None
+
+
 def structured(llm, schema):
-    """Ask the model to fill `schema` through one forced tool call (works on Groq, xAI, OpenAI)."""
+    """Ask the model to fill `schema`.
+
+    Long code (GeneratedCode / GeneratedTests) is asked for as plain text in one ```python block:
+    on Groq, forcing a big code file into a JSON tool call often fails ("did not call a tool",
+    "failed to parse tool call arguments"). Everything else uses one forced tool call, with the
+    notebook's failed_generation recovery.
+    """
     if isinstance(llm, RuleBasedChat):
         return llm.with_structured_output(schema)
+    text_field = getattr(schema, "text_field", None)
+    if text_field:
+        def run_text(messages, cfg=None):
+            reply = llm.invoke(list(messages) + [SystemMessage(content=TEXT_MODE_RULE)], cfg)
+            return schema(**{text_field: extract_code_block(str(reply.content))})
+
+        return RunnableLambda(run_text)
+
     name = _snake(schema.__name__)
     tool = convert_to_openai_tool(schema)
     tool["function"]["name"] = name
     chain = llm.bind_tools([tool], tool_choice=name) | JsonOutputKeyToolsParser(key_name=name, first_tool_only=True)
 
     def run(messages, cfg=None):
-        args = chain.invoke(messages, cfg)
+        try:
+            args = chain.invoke(messages, cfg)
+        except Exception as err:
+            rescued = _recover_failed_generation(err, schema)
+            if rescued is not None:
+                return rescued
+            raise
         if args is None:
             raise ValueError("model returned no structured answer")
         return schema.model_validate(args)

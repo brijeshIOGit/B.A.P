@@ -98,3 +98,42 @@ def test_prompts_are_masked_before_the_model():
               cfg={"callbacks": [meter]})
     assert meter.prompts and not any(secret in p for p in meter.prompts)
     assert any("[SECRET]" in p for p in meter.prompts)
+
+
+# ── real-provider quirks (no network: fake chat models) ──
+
+from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E402
+from langchain_core.messages import AIMessage  # noqa: E402
+from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
+
+
+class FakeTextChat(BaseChatModel):
+    """Answers every call with a fixed text, like a real model writing a code block."""
+    reply: str = ""
+
+    @property
+    def _llm_type(self):
+        return "fake-text"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=self.reply))])
+
+
+def test_code_is_read_from_a_python_block_not_a_tool_call():
+    fake = FakeTextChat(reply="Sure!\n```python\ndef f():\n    return 1\n```\nHope it helps.")
+    answer = models.structured(fake, GeneratedCode).invoke([HumanMessage(content="REQUEST: f")])
+    assert answer.code == "def f():\n    return 1\n"
+
+
+def test_longest_block_wins_and_no_fence_still_works():
+    assert models.extract_code_block("```python\nx = 1\n```\n```python\ndef g():\n    pass\n```").startswith("def g")
+    assert models.extract_code_block("def h():\n    return 2") == "def h():\n    return 2\n"
+
+
+def test_groq_failed_generation_is_recovered():
+    class GroqError(Exception):
+        body = {"error": {"failed_generation": '{"name": "triage", "arguments": {"task_type": "code_request", '
+                                               '"sentiment": "neutral", "urgency": 1, "wants_human": false}}'}}
+
+    rescued = models._recover_failed_generation(GroqError(), Triage)
+    assert rescued is not None and rescued.task_type == "code_request"

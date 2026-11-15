@@ -9,7 +9,7 @@ import hashlib
 import json
 import keyword
 import re
-from typing import Literal
+from typing import ClassVar, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, SystemMessage
 from langgraph.types import interrupt
@@ -57,10 +57,12 @@ class Requirements(BaseModel):
 
 
 class GeneratedCode(BaseModel):
+    text_field: ClassVar[str] = "code"  # asked for as one ```python block, not a JSON tool call
     code: str = Field(description="the full content of solution.py")
 
 
 class GeneratedTests(BaseModel):
+    text_field: ClassVar[str] = "tests"  # asked for as one ```python block, not a JSON tool call
     tests: str = Field(description="the full content of test_solution.py")
 
 
