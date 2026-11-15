@@ -14,6 +14,7 @@ from typing_extensions import TypedDict
 
 from . import agents
 from .config import USERS
+from .masking import mask_text
 
 
 class CodeForgeState(TypedDict, total=False):
@@ -23,6 +24,7 @@ class CodeForgeState(TypedDict, total=False):
     summary: str
     unhappy_streak: int
     strikes: int
+    open_ticket: dict  # this chat's ticket: later escalations add to it instead of opening another
     # reset at the start of every message by guard_in
     request: str
     pii_found: list
@@ -38,6 +40,8 @@ class CodeForgeState(TypedDict, total=False):
     cache_hit: str
     cache_source: str
     policy: dict
+    policy_retry: bool
+    policy_feedback: str
     approved: bool
     run: dict
     attempts: int
@@ -75,6 +79,8 @@ def after_test_gen(state) -> str:
 
 
 def after_policy(state) -> str:
+    if state.get("policy_retry"):
+        return "code_gen"  # the model's own import was refused: one rewrite, no strike
     verdict = state["policy"]["verdict"]
     return {"allow": "run_tests", "needs_approval": "human_approval"}.get(verdict, "refuse")
 
@@ -84,6 +90,8 @@ def after_approval(state) -> str:
 
 
 def after_run(state) -> str:
+    if state.get("refusal"):
+        return "refuse"  # quota used up: nothing ran
     return "code_gen" if state.get("repair") else "report"
 
 
@@ -106,9 +114,9 @@ def build_graph(checkpointer=None):
     g.add_edge("requirements", "code_gen")
     g.add_conditional_edges("code_gen", after_code_gen, ["test_gen", "refuse"])
     g.add_conditional_edges("test_gen", after_test_gen, ["policy_gate", "refuse"])
-    g.add_conditional_edges("policy_gate", after_policy, ["run_tests", "human_approval", "refuse"])
+    g.add_conditional_edges("policy_gate", after_policy, ["run_tests", "human_approval", "refuse", "code_gen"])
     g.add_conditional_edges("human_approval", after_approval, ["run_tests", "refuse"])
-    g.add_conditional_edges("run_tests", after_run, ["code_gen", "report"])
+    g.add_conditional_edges("run_tests", after_run, ["code_gen", "report", "refuse"])
     g.add_conditional_edges("report", needs_ticket, ["ticket", END])
     g.add_conditional_edges("refuse", needs_ticket, ["ticket", END])
     g.add_edge("ticket", END)
@@ -136,10 +144,20 @@ def make_config(user_id: str, thread: str, role: str | None = None, callbacks=No
     return cfg
 
 
+def user_input(text: str) -> dict:
+    """The graph input for one user message, MASKED before LangGraph sees it.
+
+    LangGraph checkpoints the input before the first node runs, so masking only inside
+    guard_in would leave the raw key in the checkpoint history (and in any tracing).
+    Every entry point (chat(), the UI, the scripts) must build its input here.
+    """
+    return {"messages": [HumanMessage(content=mask_text(text or ""))]}
+
+
 def chat(app, text: str, user_id: str = "u_alice", thread: str = "main", role: str | None = None, callbacks=None):
     """Send one message and return the final state (with "__interrupt__" if it paused for approval)."""
     cfg = make_config(user_id, thread, role, callbacks)
-    return app.invoke({"messages": [HumanMessage(content=text)]}, cfg)
+    return app.invoke(user_input(text), cfg)
 
 
 def resume(app, approved: bool, user_id: str, thread: str, approver_id: str = "u_carol",

@@ -18,12 +18,13 @@ from pydantic import BaseModel, Field
 from .config import PROVIDER, SETTINGS
 from .brain import guess_function_name, rule_requirements, rule_route, rule_sql, rule_triage
 from .cache import CACHE, is_shareable
-from .db import create_ticket, find_run, log_event, quota_left, save_run, who_is
-from .escalation import (REASON_CANNOT_GENERATE, REASON_DENIALS, REASON_REPAIRS, denials_need_human,
-                         next_unhappy_streak, priority_for, repairs_need_human, should_escalate)
+from .db import create_ticket, find_run, update_ticket, log_event, quota_left, run_lock, save_run, who_is
+from .escalation import (REASON_CANNOT_GENERATE, REASON_DENIALS, REASON_REPAIRS, combine_signals,
+                         denials_need_human, higher_priority, merge_ticket, next_unhappy_streak, priority_for,
+                         repairs_need_human, should_escalate)
 from .masking import mask, mask_code, mask_text
 from .models import ask_model
-from .policy import evaluate_code_and_tests
+from .policy import evaluate_code_and_tests, is_model_fixable
 from .sandbox import run_in_sandbox
 from .sql_agent import run_sql, validate_sql
 from .templates import match_template, template_requirements
@@ -49,7 +50,7 @@ class RouteDecision(BaseModel):
 
 class Requirements(BaseModel):
     """The contract that code and tests are both built from."""
-    function_name: str = Field(description="snake_case name of the one function to write")
+    function_name: str = Field(description="snake_case name of the one function, or CamelCase name of the one class")
     params: list[str] = Field(default_factory=list, description='e.g. ["text: str"]')
     returns: str = ""
     edge_cases: list[str] = Field(default_factory=list)
@@ -85,9 +86,11 @@ TRIAGE_PROMPT = ("Classify the student's latest message for a coding-help servic
 ROUTER_PROMPT = ("Decide what the student needs: python_function (they want code: a function or small program), "
                  "sql_query (a question about data in a database), or other (anything else, including code in "
                  "another programming language). Default to Python when no language is named.")
-REQUIREMENTS_PROMPT = ("Extract the requirements for ONE Python function from the request: a snake_case "
-                       "function_name, its params, what it returns, edge cases and 2-4 examples.")
-CODE_PROMPT = ("You write the content of solution.py. Define a function named `{name}` that meets the requirements. "
+REQUIREMENTS_PROMPT = ("Extract the requirements for ONE Python function (or ONE class, if the request asks for a "
+                       "class) from the request: function_name is the snake_case function name or the CamelCase "
+                       "class name, then its params, what it returns, edge cases and 2-4 examples.")
+CODE_PROMPT = ("You write the content of solution.py. Define a top-level function (or class, if one is asked for) "
+               "named `{name}` that meets the requirements. "
                "Use only the Python standard library. No file access, no network, no input(), no printing, no "
                "top-level code except imports and definitions. Return only code.")
 TESTS_PROMPT = ("You write the content of test_solution.py for pytest. Start with `from solution import {name}`. "
@@ -104,7 +107,8 @@ SUMMARY_PROMPT = "Summarise this coding-help chat in 3 short sentences. Keep tas
 TURN_RESET = {"request": "", "pii_found": [], "blocked": "", "triage": {}, "escalate_reason": "", "route": "",
               "requirements": {}, "code": "", "tests": "", "served_by": {}, "cache_hit": "", "cache_source": "", "policy": {},
               "approved": False, "run": {}, "attempts": 0, "repair": False, "refusal": {}, "ticket": {},
-              "sql": {}, "answer": "", "quota_left": 0}
+              "sql": {}, "answer": "", "quota_left": 0,
+              "policy_retry": False, "policy_feedback": ""}
 
 
 # ── small helpers ────────────────────────────────────────────────────────────
@@ -116,13 +120,16 @@ def clean_code(text: str) -> str:
     return (fence.group(1) if fence else text).strip() + "\n"
 
 
+DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+
 def defines_function(code: str, name: str) -> bool:
-    """True if the code parses and defines a function with this name."""
+    """True if the code parses and defines a function or class with this name (top level)."""
     try:
         tree = ast.parse(code)
     except SyntaxError:
         return False
-    return any(isinstance(n, ast.FunctionDef) and n.name == name for n in ast.walk(tree))
+    return any(isinstance(n, DEFINITIONS) and n.name == name for n in tree.body)
 
 
 def run_key(user_id: str, code: str, tests: str) -> str:
@@ -147,9 +154,8 @@ def guard_in(state, config):
     update = {**TURN_RESET, "request": clean, "pii_found": found, "quota_left": left}
     if clean != last.content:
         update["messages"] = [HumanMessage(content=clean, id=last.id)]  # same id: replaces the raw message
-    if left <= 0:
-        update["blocked"] = "quota"
-        update["refusal"] = {"kind": "quota", "reason": f"daily quota of {SETTINGS['quota'][role]} runs used"}
+    # The quota is NOT checked here: it limits sandbox runs, so it is enforced in run_tests.
+    # A student at the limit can still ask for a human, ask an SQL question or chat.
     return update
 
 
@@ -180,7 +186,7 @@ def triage(state, config):
     prompt = [SystemMessage(content=TRIAGE_PROMPT)] + context + [HumanMessage(content=f"REQUEST: {state['request']}")]
     answer, tier = ask_model("triage", prompt, schema=Triage, size="small",
                              template=lambda: Triage(**rule_triage(state["request"])), cfg=config)
-    signals = answer.model_dump()
+    signals = combine_signals(answer.model_dump(), rule_triage(state["request"]))
     streak = next_unhappy_streak(signals["sentiment"], state.get("unhappy_streak", 0))
     reason = should_escalate(signals, streak)
     log_event("triage", **signals, unhappy_streak=streak, escalate=reason)
@@ -245,6 +251,10 @@ def code_gen(state, config):
     request, req = state["request"], state["requirements"]
     name = req["function_name"]
     prompt = f"REQUEST: {request}\nREQUIREMENTS: {json.dumps(req)}"
+    if state.get("policy_feedback"):
+        prompt += (f"\n\nYOUR PREVIOUS CODE OR TESTS WERE REJECTED BY THE SAFETY POLICY: {state['policy_feedback']}\n"
+                   f"Use only the Python standard library (math, re, functools, itertools, collections ...). "
+                   f"Do not import sys, os or third-party packages, in the code or in the tests.")
     if state.get("attempts", 0) > 0 and state.get("run"):
         run = state["run"]
         prompt += (f"\n\nYOUR PREVIOUS CODE FAILED ITS TESTS.\nFirst failure: {run.get('first_failure')}\n"
@@ -286,6 +296,9 @@ def test_gen(state, config):
         return GeneratedTests(tests=tests) if ok else None
 
     prompt = f"REQUEST: {request}\nREQUIREMENTS: {json.dumps(req)}\nCODE UNDER TEST:\n{state['code']}"
+    if state.get("policy_feedback"):
+        prompt += (f"\n\nYOUR PREVIOUS TESTS WERE REJECTED BY THE SAFETY POLICY: {state['policy_feedback']}\n"
+                   f"Import only pytest, unittest.mock and the standard library. Never import sys or os.")
     use_template = template is not None and template["function_name"] == name
     answer, tier = ask_model("test_gen", [SystemMessage(content=TESTS_PROMPT.format(name=name)), HumanMessage(content=prompt)],
                              schema=GeneratedTests, size="big", check=check, cfg=config,
@@ -302,9 +315,18 @@ def policy_gate(state, config):
     verdict = evaluate_code_and_tests(state["code"], state["tests"])
     user_id, _ = who_is(config)
     log_event("policy", user=user_id, verdict=verdict["verdict"], reasons="; ".join(verdict["reasons"]))
-    update = {"policy": verdict}
-    if verdict["verdict"] == "deny":
-        update["refusal"] = {"kind": "policy_deny", "reason": "; ".join(verdict["reasons"])}
+    update = {"policy": verdict, "policy_retry": False}
+    if verdict["verdict"] != "deny":
+        return update
+    fixable = is_model_fixable(verdict)
+    # The model chose an unknown import or a bad test file: ask it to rewrite once (no strike).
+    # Never for cached or template answers: those would come back the same.
+    if fixable and not state.get("policy_feedback") and not state.get("cache_hit") \
+            and state.get("served_by", {}).get("code_gen") not in ("template", "cache"):
+        log_event("policy_retry", user=user_id, reasons="; ".join(verdict["reasons"]))
+        update.update(policy_retry=True, policy_feedback="; ".join(verdict["reasons"]))
+        return update
+    update["refusal"] = {"kind": "policy_deny", "reason": "; ".join(verdict["reasons"]), "strike": not fixable}
     return update
 
 
@@ -326,14 +348,22 @@ def human_approval(state, config):
 
 def run_tests(state, config):
     """Idempotency check, then the sandbox, then decide whether to repair."""
-    user_id, _ = who_is(config)
+    user_id, role = who_is(config)
     key = run_key(user_id, state["code"], state["tests"])
-    existing = find_run(key)
-    if existing:
-        log_event("run_reused", user=user_id, key=key[:12])
-        return {"run": {**existing, "reused": True, "output": ""}, "repair": False}
-    result = run_in_sandbox(state["code"], state["tests"])
-    saved = save_run(user_id, key, state["request"], state["code"], state["tests"], result, state.get("served_by", {}))
+    with run_lock(key):  # a double-click sends two identical jobs: the second waits, then reuses
+        existing = find_run(key)
+        if existing:
+            log_event("run_reused", user=user_id, key=key[:12])
+            return {"run": {**existing, "reused": True, "output": ""}, "repair": False}
+        # Quota counts every sandbox run, repairs included, and is checked before EACH run.
+        if quota_left(user_id, role) <= 0:
+            return {"repair": False, "refusal": {"kind": "quota",
+                                                 "reason": f"daily quota of {SETTINGS['quota'][role]} runs used"}}
+        result = run_in_sandbox(state["code"], state["tests"])
+        saved = save_run(user_id, key, state["request"], state["code"], state["tests"], result,
+                         state.get("served_by", {}))
+    if saved.get("reused"):  # another process stored the same key first: report that run, honestly
+        return {"run": {**saved, "output": ""}, "repair": False}
     run = {**saved, "reused": False, "output": result["output"], "timeout": result["timeout"]}
     log_event("run", user=user_id, key=key[:12], exit_code=run["exit_code"], timed_out=run["timed_out"])
     failed = run["exit_code"] != 0 and not run["timed_out"]  # a timeout is reported, not repaired
@@ -370,10 +400,12 @@ def report(state, config):
         lines.append(f"Repairs used: {state['attempts']} of {SETTINGS['max_repairs']}.")
     passed = run.get("exit_code") == 0
     update = {}
+    user_id, _ = who_is(config)
+    payload = {"requirements": req, "code": state["code"], "tests": state["tests"]}
+    # Same user, same request again (even a failing one): reuse the same code + tests, so the
+    # idempotency key matches and nothing runs twice. "Regenerate fresh" skips this.
+    CACHE.remember_repeat(user_id, state["request"], payload)
     if passed:
-        user_id, _ = who_is(config)
-        payload = {"requirements": req, "code": state["code"], "tests": state["tests"]}
-        CACHE.remember_repeat(user_id, state["request"], payload)
         if SETTINGS["use_cache"] and state.get("cache_hit") != "semantic" and \
                 is_shareable(state["request"], state.get("pii_found", [])):
             CACHE.store(state["request"], payload)  # only plain requests are shared with other users
@@ -404,12 +436,14 @@ def refuse(state, config):
     text = REFUSAL_TEXT.get(kind, "⛔ {reason}").format(reason=refusal.get("reason", ""), bullets=bullets)
     strikes = state.get("strikes", 0)
     update = {}
-    if kind == "policy_deny":
+    if kind == "policy_deny" and refusal.get("strike", True):
         strikes += 1
         text += f" (Policy strike {strikes} of 2.)"
         update["strikes"] = strikes
         if denials_need_human(strikes):
             update["escalate_reason"] = REASON_DENIALS
+    elif kind == "policy_deny":
+        text += " (The model chose this, not you: no policy strike.)"
     if kind == "cannot_generate":
         update["escalate_reason"] = REASON_CANNOT_GENERATE
     log_event("refused", kind=kind, reason=refusal.get("reason", ""))
@@ -433,17 +467,28 @@ def ticket(state, config):
                            template=lambda: Handoff(summary=f"Student needs help. {reason}.", user_ask=state["request"][:200],
                                                     suggested_next_step="Read the request and reply personally."))
     text_note = f"{note.summary} | Ask: {note.user_ask} | Next: {note.suggested_next_step} | {facts}"
-    saved = create_ticket(user_id, priority, sla, reason, text_note)
-    log_event("ticket", user=user_id, ticket=saved["id"], priority=priority, reason=reason)
+    open_ticket = state.get("open_ticket") or None
+    if merge_ticket(open_ticket) == "update":
+        priority = higher_priority(open_ticket["priority"], priority)
+        sla = {"P1": 30, "P2": 240, "P3": 1440}[priority]
+        saved = update_ticket(open_ticket["id"], priority, sla, reason, text_note)
+    else:
+        saved = create_ticket(user_id, priority, sla, reason, text_note)
+    log_event("ticket", user=user_id, ticket=saved["id"], priority=priority, reason=reason,
+              updated=bool(open_ticket))
     when = {30: "30 minutes", 240: "4 hours", 1440: "24 hours"}[sla]
-    if state.get("answer"):
+    if open_ticket:
+        message = (f"Your ticket {saved['id']} is already open, so I added this to it (priority {priority}); "
+                   f"a person will reply within {when}.")
+    elif state.get("answer"):
         message = f"I've also opened ticket {saved['id']} ({priority}): a person will reply within {when}."
     else:
         message = (f"I'm sorry this is frustrating. I've passed it to a person as ticket {saved['id']} "
                    f"(priority {priority}); you'll hear back within {when}. A masked summary is attached, so you "
                    f"won't need to repeat yourself.")
     answer = (state.get("answer", "") + "\n\n" + message).strip()
-    return {"ticket": saved, "answer": answer, "messages": [AIMessage(content=message)],
+    return {"ticket": saved, "open_ticket": {"id": saved["id"], "priority": priority, "sla_minutes": sla},
+            "answer": answer, "messages": [AIMessage(content=message)],
             "served_by": _with_tier(state, "ticket", tier)}
 
 

@@ -5,8 +5,11 @@ History functions take NO user argument: they read the user from config.
 """
 
 import json
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import Boolean, Float, Integer, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
@@ -135,8 +138,35 @@ def find_run(key: str) -> dict | None:
         return _run_dict(run) if run else None
 
 
+_RUN_LOCKS: dict = {}
+_RUN_LOCKS_GUARD = threading.Lock()
+
+
+@contextmanager
+def run_lock(key: str):
+    """One lock per idempotency key: two identical jobs at once (a double-click) run only once."""
+    with _RUN_LOCKS_GUARD:
+        lock = _RUN_LOCKS.setdefault(key, threading.Lock())
+    with lock:
+        yield
+
+
 def save_run(user_id: str, key: str, request: str, code: str, tests: str, result: dict, served_by: dict) -> dict:
-    """Store one sandbox run and return it with its id."""
+    """Store one sandbox run and return it with its id.
+
+    If another process already stored this key (the unique index refuses a second row), return
+    that stored run marked reused=True instead of crashing.
+    """
+    try:
+        return _insert_run(user_id, key, request, code, tests, result, served_by)
+    except IntegrityError:
+        existing = find_run(key)
+        if existing is None:
+            raise
+        return {**existing, "reused": True}
+
+
+def _insert_run(user_id, key, request, code, tests, result, served_by) -> dict:
     with session() as s:
         run = Run(key=key, user_id=user_id, request=mask_text(request), code=code, tests=tests,
                   exit_code=result["exit_code"], passed=result["passed"], failed=result["failed"],
@@ -189,6 +219,18 @@ def create_ticket(user_id: str, priority: str, sla_minutes: int, reason: str, no
         s.commit()
         return {"id": f"T-{1000 + ticket.id}", "priority": priority, "sla_minutes": sla_minutes,
                 "reason": reason, "note": ticket.note, "created_at": ticket.created_at}
+
+
+def update_ticket(ticket_id: str, priority: str, sla_minutes: int, reason: str, note: str) -> dict:
+    """Add a new escalation to an open ticket (one ticket per chat). Masked again, like create_ticket."""
+    with session() as s:
+        ticket = s.get(Ticket, int(str(ticket_id).removeprefix("T-")) - 1000)
+        ticket.priority, ticket.sla_minutes = priority, sla_minutes
+        ticket.reason = f"{ticket.reason}; {reason}"
+        ticket.note = mask_text(f"{ticket.note}\n--- update ---\n{note}")
+        s.commit()
+        return {"id": ticket_id, "priority": priority, "sla_minutes": sla_minutes, "reason": ticket.reason,
+                "note": ticket.note, "created_at": ticket.created_at}
 
 
 def all_tickets() -> list[dict]:

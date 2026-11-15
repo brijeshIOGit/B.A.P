@@ -14,14 +14,13 @@ from pathlib import Path
 
 import gradio as gr
 import pandas as pd
-from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
 from .. import config, db
 from ..cache import CACHE
 from ..cli import CHAOS_REQUESTS, export_feedback
 from ..cost import Meter
-from ..graph import get_app, make_config
+from ..graph import get_app, make_config, user_input
 from ..models import BREAKERS, CHAOS, reset_resilience
 from . import views
 
@@ -96,12 +95,18 @@ def _note_update(ui: dict, node: str, update: dict) -> None:
         verdict = update["policy"]["verdict"]
         detail += f" · {verdict.upper()}"
         status = "denied" if verdict == "deny" else "done"
+        if update.get("policy_retry"):
+            status, detail = "done", detail + " · model rewrites (no strike)"
+            for again in ("code_gen", "test_gen"):
+                steps["status"][again] = "pending"
     elif node == "human_approval":
         status = "done" if update.get("approved") else "denied"
         detail = "approved by an instructor" if update.get("approved") else "rejected"
     elif node == "run_tests":
-        run = update["run"]
-        if run.get("reused"):
+        run = update.get("run") or {}
+        if update.get("refusal"):
+            status, detail = "failed", "quota used up · nothing executed"
+        elif run.get("reused"):
             detail = "reused earlier run · nothing executed"
         elif run.get("timed_out"):
             status, detail = "failed", f"killed at {run.get('timeout')}s timeout"
@@ -217,7 +222,7 @@ def send(message: str, ui: dict):
         yield render(ui)
         return
     ui["steps"], ui["last"] = views.new_steps(), {}
-    yield from _drive(ui, {"messages": [HumanMessage(content=message)]}, _cfg(ui))
+    yield from _drive(ui, user_input(message), _cfg(ui))
 
 
 def decide(approved: bool, approver: str, ui: dict):
@@ -237,7 +242,7 @@ def regenerate(ui: dict):
         return
     gr.Info("Regenerating without the cache.")
     ui["steps"], ui["last"] = views.new_steps(), {}
-    yield from _drive(ui, {"messages": [HumanMessage(content=request)]}, _cfg(ui, fresh=True))
+    yield from _drive(ui, user_input(request), _cfg(ui, fresh=True))
 
 
 def approve(approver: str, ui: dict):
@@ -317,7 +322,7 @@ def run_chaos_test(ui: dict):
     app, rows = get_app(), []
     try:
         for i, text in enumerate(CHAOS_REQUESTS, start=1):
-            state = app.invoke({"messages": [HumanMessage(content=text)]},
+            state = app.invoke(user_input(text),
                                make_config("chaos-bot", f"chaos-{uuid.uuid4().hex[:6]}", role="student"))
             served = state.get("served_by", {})
             answer = state.get("answer", "")

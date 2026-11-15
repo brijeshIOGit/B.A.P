@@ -40,6 +40,8 @@ MAC_PROFILE = """(version 1)
 
 _LINUX_UNSHARE_OK = None  # checked once
 
+MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024  # 1 GB of address space for pytest + the student's code
+
 
 def _linux_unshare_works() -> bool:
     """True if `unshare --net` is allowed for normal users on this machine."""
@@ -69,12 +71,19 @@ def _limits(timeout: float):
     def apply():
         try:
             import resource
-
-            cpu = int(timeout) + 2
-            resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
-            resource.setrlimit(resource.RLIMIT_FSIZE, (10_000_000, 10_000_000))
-        except Exception:
-            pass
+        except ImportError:
+            return
+        cpu = int(timeout) + 2
+        limits = [(resource.RLIMIT_CPU, cpu), (resource.RLIMIT_FSIZE, 10_000_000)]
+        # Memory cap so `[0] * 10**10` fails with MemoryError instead of eating the host's RAM.
+        # Linux enforces RLIMIT_AS; macOS ignores it (there a huge malloc fails on its own).
+        if sys.platform.startswith("linux"):
+            limits.append((resource.RLIMIT_AS, MEMORY_LIMIT_BYTES))
+        for which, value in limits:
+            try:  # set each limit on its own, so one the OS refuses does not skip the others
+                resource.setrlimit(which, (value, value))
+            except (ValueError, OSError):
+                pass
 
     return apply
 

@@ -7,8 +7,18 @@ does not swallow another.
 
 import re
 
-# sk-..., sk-proj-..., gsk_... (Groq), xai-... (xAI). 16+ characters so words like "sk-learn" survive.
-SECRET_RE = re.compile(r"\b(?:sk-(?:proj-)?[A-Za-z0-9_\-]{16,}|gsk_[A-Za-z0-9]{16,}|xai-[A-Za-z0-9]{16,})")
+# Secret keys. 16+ characters after the prefix so words like "sk-learn" survive.
+SECRET_RE = re.compile(
+    r"\b(?:"
+    r"sk-(?:proj-|ant-)?[A-Za-z0-9_\-]{16,}"  # OpenAI, Anthropic
+    r"|gsk_[A-Za-z0-9]{16,}"  # Groq
+    r"|xai-[A-Za-z0-9]{16,}"  # xAI
+    r"|(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}"  # Stripe
+    r"|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}"  # GitHub
+    r"|(?:AKIA|ASIA)[0-9A-Z]{16}"  # AWS access key id
+    r"|AIza[0-9A-Za-z_\-]{35}"  # Google API key
+    r"|xox[abprs]-[A-Za-z0-9\-]{10,}"  # Slack
+    r")")
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 # 13-19 digits with optional spaces or dashes. Only masked when the Luhn checksum is valid.
 CARD_RE = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
@@ -16,6 +26,13 @@ CARD_RE = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
 AADHAAR_RE = re.compile(r"(?<!\d)[2-9]\d{3}([ -]?)\d{4}\1\d{4}(?!\d)")
 # Indian mobile: optional +91 / 0, then 10 digits starting 6-9.
 PHONE_RE = re.compile(r"(?<!\d)(?:\+91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5}(?!\d)")
+# Any other international number: a + country code, then 7-14 more digits in groups.
+INTL_PHONE_RE = re.compile(r"(?<![\w+])\+\d{1,3}(?:[\s.-]?\(?\d{1,4}\)?){2,5}(?!\d)")
+# A bare number right after one of these is a value in code ("return 9876543210", "x == ..."),
+# not a phone. A plain "=" is NOT on the list, so "phone = 9876543210" is still masked (fail closed).
+CODE_VALUE_BEFORE = re.compile(r"(?:\breturn|==|!=|<=|>=|[<>*/%])\s*$")
+PLACEHOLDERS = {"[SECRET]": "secret", "[EMAIL]": "email", "[CARD]": "card", "[AADHAAR]": "aadhaar",
+                "[PHONE]": "phone"}
 
 
 def luhn_ok(digits: str) -> bool:
@@ -43,6 +60,21 @@ def _mask_cards(text: str, found: list) -> str:
     return CARD_RE.sub(replace, text)
 
 
+def _mask_phones(text: str, found: list) -> str:
+    """Replace phone numbers with [PHONE], except a bare number used as a value in code."""
+
+    def replace(match):
+        raw = match.group()
+        bare = raw.isdigit()  # no +91, no spaces: could be a constant like 9876543210
+        if bare and CODE_VALUE_BEFORE.search(text[max(0, match.start() - 12):match.start()]):
+            return raw
+        found.append("phone")
+        return "[PHONE]"
+
+    text = PHONE_RE.sub(replace, text)
+    return _sub(INTL_PHONE_RE, "[PHONE]", "phone", text, found)
+
+
 def _sub(pattern, token: str, kind: str, text: str, found: list) -> str:
     """Replace every match of pattern with token and note the kind once."""
     if pattern.search(text):
@@ -60,7 +92,9 @@ def mask(text: str) -> tuple[str, list]:
     text = _sub(EMAIL_RE, "[EMAIL]", "email", text, found)
     text = _mask_cards(text, found)
     text = _sub(AADHAAR_RE, "[AADHAAR]", "aadhaar", text, found)
-    text = _sub(PHONE_RE, "[PHONE]", "phone", text, found)
+    text = _mask_phones(text, found)
+    # Text that was masked earlier (e.g. by graph.user_input) still reports what it held.
+    found += [kind for token, kind in PLACEHOLDERS.items() if token in text]
     return text, sorted(set(found))
 
 

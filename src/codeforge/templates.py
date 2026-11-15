@@ -138,6 +138,7 @@ def test_negative_raises():
     {
         "name": "fibonacci",
         "any": ["fibonacci"],
+        "none": ["list of", "first n", "sequence up to", "series up to", "up to n"],  # those want a list
         "function_name": "fibonacci",
         "params": ["n: int"],
         "returns": "the n-th Fibonacci number (fibonacci(0) = 0, fibonacci(1) = 1)",
@@ -442,6 +443,68 @@ def test_minus_forty():
     assert celsius_to_fahrenheit(-40) == -40
 ''',
     },
+    {
+        "name": "stack",
+        "any": ["stack"],
+        "none": ["overflow"],
+        "function_name": "Stack",
+        "params": [],
+        "returns": "a Stack class with push, pop, peek, is_empty and len()",
+        "edge_cases": ["pop or peek on an empty stack raises IndexError"],
+        "code": '''class Stack:
+    """A last-in, first-out stack backed by a list."""
+
+    def __init__(self):
+        self._items = []
+
+    def push(self, item):
+        """Put an item on top."""
+        self._items.append(item)
+
+    def pop(self):
+        """Remove and return the top item. Raises IndexError when empty."""
+        if not self._items:
+            raise IndexError("pop from an empty stack")
+        return self._items.pop()
+
+    def peek(self):
+        """Return the top item without removing it. Raises IndexError when empty."""
+        if not self._items:
+            raise IndexError("peek at an empty stack")
+        return self._items[-1]
+
+    def is_empty(self):
+        return not self._items
+
+    def __len__(self):
+        return len(self._items)
+''',
+        "tests": '''import pytest
+from solution import Stack
+
+
+def test_push_then_pop_is_lifo():
+    s = Stack()
+    s.push(1)
+    s.push(2)
+    assert s.pop() == 2 and s.pop() == 1
+
+
+def test_peek_does_not_remove():
+    s = Stack()
+    s.push("a")
+    assert s.peek() == "a" and len(s) == 1
+
+
+def test_empty_stack():
+    s = Stack()
+    assert s.is_empty() and len(s) == 0
+    with pytest.raises(IndexError):
+        s.pop()
+    with pytest.raises(IndexError):
+        s.peek()
+''',
+    },
 ]
 
 
@@ -450,9 +513,32 @@ def _has(text: str, phrase: str) -> bool:
     return phrase in text
 
 
+# Words that add a rule the templates do not follow. A request with one of them never gets a
+# template: in an outage it gets an honest "cannot generate now" instead of code that passes
+# the template's tests but ignores what the student asked for.
+SPEC_PHRASES = (
+    "case-sensitive", "case sensitive", "in place", "in-place", "recursion", "recursive", "recursively",
+    "iterative", "iteratively",
+    "1-indexed", "0-indexed", "one-indexed", "zero-indexed", "1 indexed", "0 indexed", "raise", "raises", "raising", "exception", "exceptions",
+    "error", "errors", "without using", "don't use", "do not use", "dont use", "not ignore", "doesn't ignore",
+    "dont ignore", "don't ignore", "generator", "yield", "memo", "memoize", "memoized", "memoization", "lru_cache", "decorator", "async", "return none",
+    "one line", "one-liner", "big o", "o(1)", "o(n)", "o(log", "dictionary", "dict", "type hint",
+    "docstring", "unicode", "bigint", "modulo", "mod 10",
+)
+
+
+def has_extra_spec(request: str) -> bool:
+    """True when the request adds a rule (see SPEC_PHRASES) that no template is built for."""
+    text = re.sub(r"\s+", " ", (request or "").lower())
+    # Whole words only: "raise" must not fire on "praise", nor "memo" on "memory".
+    return any(re.search(rf"(?<![a-z0-9]){re.escape(p)}(?![a-z0-9])", text) for p in SPEC_PHRASES)
+
+
 def match_template(request: str) -> dict | None:
     """The first template whose keywords fit this request, or None."""
     text = re.sub(r"\s+", " ", (request or "").lower())
+    if has_extra_spec(text):
+        return None
     for template in TEMPLATES:
         if not any(_has(text, p) for p in template.get("any", [])):
             continue
