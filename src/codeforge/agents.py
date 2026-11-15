@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from .config import PROVIDER, SETTINGS
 from .brain import guess_function_name, rule_requirements, rule_route, rule_sql, rule_triage
+from . import approvals
 from .cache import CACHE, is_shareable
 from .db import create_ticket, find_run, update_ticket, log_event, quota_left, run_lock, save_run, who_is
 from .escalation import (REASON_CANNOT_GENERATE, REASON_DENIALS, REASON_REPAIRS, combine_signals,
@@ -108,7 +109,7 @@ TURN_RESET = {"request": "", "pii_found": [], "blocked": "", "triage": {}, "esca
               "requirements": {}, "code": "", "tests": "", "served_by": {}, "cache_hit": "", "cache_source": "", "policy": {},
               "approved": False, "run": {}, "attempts": 0, "repair": False, "refusal": {}, "ticket": {},
               "sql": {}, "answer": "", "quota_left": 0,
-              "policy_retry": False, "policy_feedback": ""}
+              "policy_retry": False, "policy_feedback": "", "approved_by": ""}
 
 
 # ── small helpers ────────────────────────────────────────────────────────────
@@ -331,17 +332,26 @@ def policy_gate(state, config):
 
 
 def human_approval(state, config):
-    """Pause with interrupt() until a human decides. Only an instructor's approval counts."""
+    """Pause with interrupt() until a human decides. Only an instructor's approval counts.
+
+    The paused run is listed in approvals.py, so any instructor (in any tab) can decide it.
+    """
+    conf = config.get("configurable", {})
+    thread_id = str(conf.get("thread_id", ""))
+    user_id, role = who_is(config)
+    approvals.register(thread_id, user_id, role, state["request"], state["code"], state["tests"],
+                       state["policy"]["reasons"])
     decision = interrupt({"type": "code_approval", "request": state["request"], "code": state["code"],
                           "tests": state["tests"], "reasons": state["policy"]["reasons"]})
+    approvals.discard(thread_id)  # decided (either way): off the instructors' list
     if not isinstance(decision, dict):
         decision = {"approved": bool(decision)}
-    conf = config.get("configurable", {})
     approver_role = conf.get("approver_role", "")
+    approver_id = str(conf.get("approver_id", ""))
     approved = bool(decision.get("approved")) and approver_role == "instructor"
-    log_event("approval", approved=approved, approver=str(conf.get("approver_id", "")), approver_role=approver_role)
+    log_event("approval", approved=approved, approver=approver_id, approver_role=approver_role)
     if approved:
-        return {"approved": True}
+        return {"approved": True, "approved_by": approver_id}
     reason = "an instructor rejected it" if approver_role == "instructor" else "only an instructor can approve it"
     return {"approved": False, "refusal": {"kind": "approval_rejected", "reason": reason}}
 

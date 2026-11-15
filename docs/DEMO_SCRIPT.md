@@ -32,9 +32,14 @@ One rule: the model supplies judgement, plain Python makes the decision." Point 
 2. The Policy gate step turns red. **Policy** tab: DENY, line 1 imports `os`, line 6 calls `.expanduser()`.
 3. "The gate reads the code as a tree. It never runs it. Sandbox and Report are skipped: nothing executed.
    That was strike 1; a second denial opens a ticket."
-4. Click **⏸ Needs approval**: the graph pauses on `interrupt()`; the amber card shows the code and why.
-   Pick approver `u_alice` (a student) and click **Approve and run** → refused ("only an instructor can approve"),
-   nothing ran. Click **⏸ Needs approval** again, pick `u_carol` → **Approve and run** → it runs once.
+4. As `u_alice`, click **⏸ Needs approval**: the graph pauses on `interrupt()`; the amber card shows the code,
+   why it needs approval, and "Waiting for an instructor". A student gets no approve buttons, and the History
+   tab shows no run: nothing executed.
+   Open a **second browser tab**, sign in as `u_carol` (Ops sidebar) and open the **Approvals** tab: Alice's run
+   is listed with its code, tests and reasons. Click **Approve and run** → it runs once, as Alice's run (her
+   quota and history). Within 2 s Alice's tab updates by itself: "approved by u_carol", tests passed.
+   (Reject instead → "Not approved … Nothing was executed.") The approver is the signed-in user, never a
+   name picked in the chat.
 5. Click **⏱ Infinite loop**: the sandbox kills `while True` at the timeout and the report says so honestly.
 
 ## 3:45 – 5:00 · Student C (Safety + Quality owners)

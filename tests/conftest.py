@@ -12,7 +12,7 @@ import copy  # noqa: E402
 
 import pytest  # noqa: E402
 
-from codeforge import cache, config, db, models, policy  # noqa: E402
+from codeforge import approvals, cache, config, db, models, policy  # noqa: E402
 from codeforge.graph import build_graph  # noqa: E402
 
 # Live demo hook for the UI "weaken a rule" switch: CODEFORGE_WEAKEN=allow_os loosens the
@@ -33,6 +33,7 @@ def fresh_system(tmp_path):
     cache.CACHE.clear()
     cache.CACHE.blocked.clear()
     models.reset_resilience()
+    approvals.clear()
     config.SLEEP = lambda seconds: None  # retries do not really wait in tests
     yield
     config.SETTINGS.clear()

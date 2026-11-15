@@ -43,6 +43,7 @@ class CodeForgeState(TypedDict, total=False):
     policy_retry: bool
     policy_feedback: str
     approved: bool
+    approved_by: str
     run: dict
     attempts: int
     repair: bool
